@@ -49,6 +49,15 @@ export async function GET(request: NextRequest) {
         }
       }
 
+      // 解析 review_levels JSON
+      if (inspection.review_levels && typeof inspection.review_levels === 'string') {
+        try {
+          inspection.review_levels = JSON.parse(inspection.review_levels);
+        } catch {
+          inspection.review_levels = ['line_leader', 'supervisor', 'qc'];
+        }
+      }
+
       return NextResponse.json({
         success: true,
         data: inspection,
@@ -116,7 +125,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { inspection_date, product_name, product_code, color_number, batch_number, work_order_image, instruction_order_image, comparisons, result, result_summary, submit_explanation, label_comparisons } = await request.json();
+    const { inspection_date, product_name, product_code, color_number, batch_number, work_order_image, instruction_order_image, comparisons, result, result_summary, submit_explanation, label_comparisons, review_levels } = await request.json();
 
     if (!product_name || !product_code) {
       return NextResponse.json(
@@ -138,10 +147,18 @@ export async function POST(request: NextRequest) {
 
     const imageToSave = work_order_image || instruction_order_image || null;
 
+    // 确定审核链路和初始状态
+    const validLevels = ['line_leader', 'supervisor', 'qc'];
+    const levels = Array.isArray(review_levels) && review_levels.length > 0
+      ? review_levels.filter((l: string) => validLevels.includes(l))
+      : ['line_leader', 'supervisor', 'qc'];
+    const firstLevel = levels[0];
+    const initialStatus = `${firstLevel}_review`;
+
     // 创建检验记录
     const insertInspection = db.prepare(`
-      INSERT INTO inspections (inspection_date, product_name, product_code, color_number, batch_number, work_order_image, comparisons, result, result_summary, submit_explanation, label_comparisons, assistant_id, assistant_name, status)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO inspections (inspection_date, product_name, product_code, color_number, batch_number, work_order_image, comparisons, result, result_summary, submit_explanation, label_comparisons, review_levels, assistant_id, assistant_name, status)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     const inspectionResult = insertInspection.run(
@@ -156,9 +173,10 @@ export async function POST(request: NextRequest) {
       result_summary || null,
       submit_explanation || result_summary || null,
       label_comparisons ? JSON.stringify(label_comparisons) : null,
+      JSON.stringify(levels),
       user.id,
       user.name || user.username,
-      'line_leader_review'
+      initialStatus
     );
 
     const inspectionId = inspectionResult.lastInsertRowid;

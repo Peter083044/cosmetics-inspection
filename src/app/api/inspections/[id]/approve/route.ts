@@ -1,8 +1,46 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getCurrentUser, REVIEW_FLOW, REJECT_FLOW } from '@/lib/auth';
+import { getCurrentUser, REJECT_FLOW } from '@/lib/auth';
 import db, { initDatabase } from '@/lib/db';
 
 initDatabase();
+
+// 获取检验记录的审核链路
+function getReviewLevels(inspection: any): string[] {
+  try {
+    const levels = typeof inspection.review_levels === 'string'
+      ? JSON.parse(inspection.review_levels)
+      : inspection.review_levels;
+    if (Array.isArray(levels) && levels.length > 0) {
+      return levels;
+    }
+  } catch {
+    // ignore
+  }
+  return ['line_leader', 'supervisor', 'qc'];
+}
+
+// 根据审核链路确定下一阶段状态
+function getNextStatus(levels: string[], currentRole: string): string {
+  const currentIndex = levels.indexOf(currentRole);
+  if (currentIndex === -1 || currentIndex >= levels.length - 1) {
+    return 'approved'; // 已是最后一级，审核通过
+  }
+  return `${levels[currentIndex + 1]}_review`;
+}
+
+// 根据审核链路确定退回目标
+function getReturnTarget(levels: string[], currentRole: string): { status: string; back_to: string } | null {
+  const currentIndex = levels.indexOf(currentRole);
+  if (currentIndex <= 0) {
+    return null; // 已是第一级，无法退回
+  }
+  const prevRole = levels[currentIndex - 1];
+  if (prevRole === 'line_leader') {
+    return { status: 'draft', back_to: 'assistant' };
+  }
+  // 退回到上一审核级别
+  return { status: `${prevRole}_review`, back_to: prevRole };
+}
 
 // POST /api/inspections/[id]/approve - 审核检验记录
 export async function POST(
@@ -26,7 +64,6 @@ export async function POST(
     }
 
     const { action, comment, comments, submitReason, submit_explanation } = await request.json();
-    // 兼容前端发送 comment 或 comments
     const remark = comment || comments || null;
 
     if (!action || !['approved', 'rejected', 'returned', 'submitted'].includes(action)) {
@@ -45,7 +82,10 @@ export async function POST(
       );
     }
 
-    // 处理"提交"操作（辅助人员从草稿提交到线长审核）
+    const reviewLevels = getReviewLevels(inspection);
+    const firstLevel = reviewLevels[0];
+
+    // 处理"提交"操作（辅助人员从草稿提交到审核）
     if (action === 'submitted') {
       if (user.role !== 'assistant' && user.role !== 'admin') {
         return NextResponse.json(
@@ -87,17 +127,18 @@ export async function POST(
         submitReason || submit_explanation || null
       );
 
-      // 更新状态到线长审核
+      // 更新状态到第一个审核级别
       const explanation = submitReason || submit_explanation || null;
+      const initialStatus = `${firstLevel}_review`;
       db.prepare(`
         UPDATE inspections 
-        SET status = 'line_leader_review', submit_explanation = ?, updated_at = CURRENT_TIMESTAMP
+        SET status = ?, submit_explanation = ?, updated_at = CURRENT_TIMESTAMP
         WHERE id = ?
-      `).run(explanation, inspectionId);
+      `).run(initialStatus, explanation, inspectionId);
 
       return NextResponse.json({
         success: true,
-        newStatus: 'line_leader_review',
+        newStatus: initialStatus,
       });
     }
 
@@ -108,6 +149,13 @@ export async function POST(
         return NextResponse.json(
           { error: `当前记录不在审核阶段（当前：${inspection.status}，期望：${expectedStatus}）` },
           { status: 400 }
+        );
+      }
+      // 检查当前角色是否在审核链路中
+      if (!reviewLevels.includes(user.role)) {
+        return NextResponse.json(
+          { error: '当前角色不在该记录的审核链路中' },
+          { status: 403 }
         );
       }
     }
@@ -135,11 +183,11 @@ export async function POST(
       // 驳回 - 直接变为已驳回状态
       newStatus = 'rejected';
     } else if (action === 'returned') {
-      // 退回 - 返回上一级，让上一级重新编辑
-      const rejectFlow = REJECT_FLOW[user.role as keyof typeof REJECT_FLOW];
-      if (rejectFlow) {
-        newStatus = rejectFlow.status;
-        rejectedTo = rejectFlow.back_to;
+      // 退回 - 根据审核链路返回上一级
+      const returnTarget = getReturnTarget(reviewLevels, user.role);
+      if (returnTarget) {
+        newStatus = returnTarget.status;
+        rejectedTo = returnTarget.back_to;
       } else {
         return NextResponse.json(
           { error: '无法退回，当前已是第一级审核' },
@@ -147,9 +195,8 @@ export async function POST(
         );
       }
     } else {
-      // 通过 - 进入下一阶段
-      const flow = REVIEW_FLOW[user.role as keyof typeof REVIEW_FLOW];
-      newStatus = flow?.status || 'approved';
+      // 通过 - 根据审核链路进入下一阶段
+      newStatus = getNextStatus(reviewLevels, user.role);
     }
 
     db.prepare(`

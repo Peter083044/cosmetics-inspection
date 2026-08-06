@@ -67,6 +67,9 @@ export default function NewInspectionPage() {
     LABEL_ITEMS.map((l, i) => ({ index: l.id, name: l.name, standard: '', actual: '', result: 'pass', difference: '' }))
   );
 
+  // Review levels selection
+  const [reviewLevels, setReviewLevels] = useState<string[]>(['line_leader', 'supervisor', 'qc']);
+
   // Auto-comparing states
   const [comparingSides, setComparingSides] = useState<Set<number>>(new Set());
   const [comparingLabels, setComparingLabels] = useState<Set<number>>(new Set());
@@ -86,6 +89,25 @@ export default function NewInspectionPage() {
       })
       .catch(() => router.push('/login'));
   }, []);
+
+  const REVIEW_LEVEL_OPTIONS = [
+    { value: 'line_leader', label: '线长' },
+    { value: 'supervisor', label: '主管' },
+    { value: 'qc', label: 'QC' },
+  ];
+
+  const toggleReviewLevel = (level: string) => {
+    setReviewLevels(prev => {
+      if (prev.includes(level)) {
+        // Don't allow removing all levels
+        if (prev.length <= 1) return prev;
+        return prev.filter(l => l !== level);
+      }
+      // Add in order
+      const order = ['line_leader', 'supervisor', 'qc'];
+      return [...prev, level].sort((a, b) => order.indexOf(a) - order.indexOf(b));
+    });
+  };
 
   // Compress image before upload using Canvas API
   const compressImage = (file: File, maxSize = 1920, quality = 0.8): Promise<Blob> => {
@@ -329,6 +351,7 @@ export default function NewInspectionPage() {
           instruction_order_image: instructionOrderImage,
           comparisons: activeComparisons,
           label_comparisons: labelComparisons.filter(lc => lc.standard || lc.actual),
+          review_levels: reviewLevels,
           result: hasFail ? 'fail' : 'pass',
           result_summary: resultSummary || (hasFail ? '存在不通过项' : '全部通过'),
           submit_explanation: hasFail ? resultSummary : undefined,
@@ -398,6 +421,41 @@ export default function NewInspectionPage() {
                 <div className="text">点击上传工单照片</div>
               </div>
             )}
+          </div>
+        </div>
+      </div>
+
+      {/* Section: Review Levels */}
+      <div className="section">
+        <div className="section-title">📋 审核流程 <span style={{ fontSize: '12px', color: '#999', fontWeight: '400' }}>(选择需要的审核级别)</span></div>
+        <div className="card" style={{ padding: '12px' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+            {REVIEW_LEVEL_OPTIONS.map(opt => {
+              const isSelected = reviewLevels.includes(opt.value);
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => toggleReviewLevel(opt.value)}
+                  style={{
+                    padding: '8px 16px',
+                    borderRadius: '20px',
+                    border: isSelected ? '2px solid #4f46e5' : '2px solid #d1d5db',
+                    background: isSelected ? '#eef2ff' : '#fff',
+                    color: isSelected ? '#4f46e5' : '#6b7280',
+                    fontWeight: isSelected ? '600' : '400',
+                    fontSize: '14px',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                  }}
+                >
+                  {isSelected ? '✓ ' : ''}{opt.label}
+                </button>
+              );
+            })}
+          </div>
+          <div style={{ fontSize: '12px', color: '#999', marginTop: '8px' }}>
+            审核顺序：辅助录入 → {reviewLevels.map(l => REVIEW_LEVEL_OPTIONS.find(o => o.value === l)?.label).filter(Boolean).join(' → ')}
           </div>
         </div>
       </div>
