@@ -112,7 +112,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST /api/inspections - 创建检验记录
+// POST /api/inspections - 创建检验记录 或 批量删除（_action: 'delete'）
 export async function POST(request: NextRequest) {
   try {
     const user = await getCurrentUser();
@@ -120,6 +120,78 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: '未登录' }, { status: 401 });
     }
 
+    // 检查是否是删除操作
+    let body;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ error: '请求体格式错误' }, { status: 400 });
+    }
+
+    if (body._action === 'delete') {
+      if (user.role !== 'admin') {
+        return NextResponse.json({ error: '仅管理员可删除记录' }, { status: 403 });
+      }
+      const { ids } = body as { ids: number[]; _action: string };
+      if (!ids || !Array.isArray(ids) || ids.length === 0) {
+        return NextResponse.json({ error: '请提供要删除的记录ID' }, { status: 400 });
+      }
+
+      const placeholders = ids.map(() => '?').join(',');
+
+      // 获取要删除记录的照片路径
+      const photos = db.prepare(`
+        SELECT comparisons, label_comparisons FROM inspections WHERE id IN (${placeholders})
+      `).all(...ids) as any[];
+
+      const photoPaths = new Set<string>();
+      for (const record of photos) {
+        try {
+          const comparisons = JSON.parse(record.comparisons || '[]');
+          for (const c of comparisons) {
+            if (c.standard_photo) photoPaths.add(c.standard_photo);
+            if (c.actual_photo) photoPaths.add(c.actual_photo);
+          }
+          const labels = JSON.parse(record.label_comparisons || '[]');
+          for (const l of labels) {
+            if (l.standard_photo) photoPaths.add(l.standard_photo);
+            if (l.actual_photo) photoPaths.add(l.actual_photo);
+          }
+        } catch { /* ignore */ }
+      }
+
+      // 删除记录
+      const result = db.prepare(`DELETE FROM inspections WHERE id IN (${placeholders})`).run(...ids);
+
+      // 删除审核日志
+      db.prepare(`DELETE FROM approvals WHERE inspection_id IN (${placeholders})`).run(...ids);
+
+      // 删除不再被引用的照片文件
+      let deletedPhotos = 0;
+      for (const photoPath of photoPaths) {
+        const refCount = db.prepare(`
+          SELECT COUNT(*) as cnt FROM inspections WHERE
+          comparisons LIKE ? OR label_comparisons LIKE ?
+        `).get(`%${photoPath}%`, `%${photoPath}%`) as any;
+
+        if (refCount.cnt === 0) {
+          const fullPath = path.join(process.cwd(), 'public', photoPath);
+          try {
+            if (fs.existsSync(fullPath)) {
+              fs.unlinkSync(fullPath);
+              deletedPhotos++;
+            }
+          } catch { /* ignore */ }
+        }
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: `已删除 ${result.changes} 条记录，${deletedPhotos} 张照片`,
+      });
+    }
+
+    // 创建检验记录
     if (user.role !== 'assistant' && user.role !== 'admin') {
       return NextResponse.json(
         { error: '只有辅助角色可以创建检验记录' },
@@ -210,7 +282,12 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: '仅管理员可删除记录' }, { status: 403 });
     }
 
-    const body = await request.json();
+    let body;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ error: '请求体格式错误' }, { status: 400 });
+    }
     const { ids } = body as { ids: number[] };
 
     if (!ids || !Array.isArray(ids) || ids.length === 0) {

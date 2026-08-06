@@ -394,9 +394,9 @@ export default function InspectionDetailPage({ params }: { params: Promise<{ id:
     setActionLoading(true);
     try {
       const res = await fetch(`/api/inspections`, {
-        method: 'DELETE',
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ids: [inspection.id] }),
+        body: JSON.stringify({ ids: [inspection.id], _action: 'delete' }),
       });
       const data = await res.json();
       if (data.success) {

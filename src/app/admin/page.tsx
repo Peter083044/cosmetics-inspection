@@ -551,9 +551,9 @@ function AdminRecords() {
   const handleDelete = async (id: number) => {
     try {
       const res = await fetch('/api/inspections', {
-        method: 'DELETE',
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ids: [id] }),
+        body: JSON.stringify({ ids: [id], _action: 'delete' }),
       });
       const data = await res.json();
       if (data.success) {
@@ -575,13 +575,13 @@ function AdminRecords() {
     if (selectedIds.size === 0) return;
     try {
       const res = await fetch('/api/inspections', {
-        method: 'DELETE',
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ids: Array.from(selectedIds) }),
+        body: JSON.stringify({ ids: Array.from(selectedIds), _action: 'delete' }),
       });
       const data = await res.json();
       if (data.success) {
-        setMessage(`已删除 ${data.data.deletedCount} 条记录`);
+        setMessage(data.message || `已删除 ${selectedIds.size} 条记录`);
         setRecords(prev => prev.filter(r => !selectedIds.has(r.id)));
         setSelectedIds(new Set());
       } else {

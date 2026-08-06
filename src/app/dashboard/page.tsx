@@ -110,9 +110,9 @@ export default function DashboardPage() {
     setDeleting(true);
     try {
       const res = await fetch('/api/inspections', {
-        method: 'DELETE',
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ids: Array.from(selectedIds) }),
+        body: JSON.stringify({ ids: Array.from(selectedIds), _action: 'delete' }),
       });
       const data = await res.json();
       if (data.success) {
