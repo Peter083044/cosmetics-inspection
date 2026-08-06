@@ -115,27 +115,27 @@ export async function GET(request: NextRequest) {
   try {
     const token = request.cookies.get('auth_token')?.value;
     if (!token) {
-      return NextResponse.json({ error: '未登录' }, { status: 401 });
+      return NextResponse.json({ success: false, error: '未登录' }, { status: 401 });
     }
 
     const { verifyToken } = await import('@/lib/auth');
     const payload = verifyToken(token);
     if (!payload) {
-      return NextResponse.json({ error: 'Token无效' }, { status: 401 });
+      return NextResponse.json({ success: false, error: 'Token无效' }, { status: 401 });
     }
 
     const stmt = db.prepare('SELECT id, username, name, role FROM users WHERE id = ?');
     const user = stmt.get(payload.userId);
 
     if (!user) {
-      return NextResponse.json({ error: '用户不存在' }, { status: 404 });
+      return NextResponse.json({ success: false, error: '用户不存在' }, { status: 404 });
     }
 
-    return NextResponse.json({ user });
+    return NextResponse.json({ success: true, user });
   } catch (error) {
     console.error('Auth check error:', error);
     return NextResponse.json(
-      { error: '获取用户信息失败' },
+      { success: false, error: '获取用户信息失败' },
       { status: 500 }
     );
   }
