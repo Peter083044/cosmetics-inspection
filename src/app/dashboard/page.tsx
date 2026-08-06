@@ -1,12 +1,23 @@
-"use client";
+'use client';
 
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { PWARegister } from "@/components/pwa-register";
-import { InstallPrompt } from "@/components/install-prompt";
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+
+interface Inspection {
+  id: number;
+  inspection_date: string;
+  product_name: string;
+  product_code: string;
+  color_number: string;
+  batch_number: string;
+  status: string;
+  result: string;
+  created_by_name: string;
+  created_at: string;
+  reviewer_name?: string;
+  review_comment?: string;
+  reviewed_at?: string;
+}
 
 interface User {
   id: number;
@@ -15,241 +26,155 @@ interface User {
   role: string;
 }
 
-const ROLE_NAMES: Record<string, string> = {
-  assistant: "辅助",
-  line_leader: "线长",
-  supervisor: "主管",
-  qc: "QC",
-  admin: "管理员",
+const STATUS_MAP: Record<string, { label: string; cls: string }> = {
+  line_leader_review: { label: '待线长审核', cls: 'status-pending' },
+  supervisor_review: { label: '待主管审核', cls: 'status-pending' },
+  qc_review: { label: '待QC审核', cls: 'status-pending' },
+  approved: { label: '已通过', cls: 'status-approved' },
+  rejected: { label: '已驳回', cls: 'status-rejected' },
 };
 
-const STATUS_NAMES: Record<string, string> = {
-  pending: "待提交",
-  line_leader_review: "线长审核中",
-  supervisor_review: "主管审核中",
-  qc_review: "QC审核中",
-  approved: "已通过",
-  rejected: "已驳回",
-};
-
-const STATUS_COLORS: Record<string, string> = {
-  pending: "bg-gray-100 text-gray-700",
-  line_leader_review: "bg-blue-100 text-blue-700",
-  supervisor_review: "bg-purple-100 text-purple-700",
-  qc_review: "bg-orange-100 text-orange-700",
-  approved: "bg-green-100 text-green-700",
-  rejected: "bg-red-100 text-red-700",
+const ROLE_LABELS: Record<string, string> = {
+  assistant: '辅助',
+  line_leader: '线长',
+  supervisor: '主管',
+  qc: 'QC',
+  admin: '管理员',
 };
 
 export default function DashboardPage() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
-  const [inspections, setInspections] = useState<any[]>([]);
+  const [inspections, setInspections] = useState<Inspection[]>([]);
+  const [activeTab, setActiveTab] = useState<'pending' | 'all'>('pending');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    checkAuth();
+    fetchUser();
+    fetchInspections();
   }, []);
 
-  const checkAuth = async () => {
+  const fetchUser = async () => {
     try {
-      const res = await fetch("/api/auth");
-      if (!res.ok) {
-        router.push("/login");
-        return;
-      }
+      const res = await fetch('/api/auth');
       const data = await res.json();
-      setUser(data.user);
-      loadInspections();
+      if (data.success) {
+        setUser(data.user);
+      } else {
+        router.push('/login');
+      }
     } catch {
-      router.push("/login");
+      router.push('/login');
     }
   };
 
-  const loadInspections = async () => {
+  const fetchInspections = async () => {
+    setLoading(true);
     try {
-      const res = await fetch("/api/inspections");
-      if (res.ok) {
-        const data = await res.json();
+      const res = await fetch('/api/inspections');
+      const data = await res.json();
+      if (data.success) {
         setInspections(data.data || []);
       }
-    } catch (error) {
-      console.error("Load inspections error:", error);
+    } catch {
+      // ignore
     } finally {
       setLoading(false);
     }
   };
 
   const handleLogout = async () => {
-    await fetch("/api/auth", { method: "DELETE" });
-    router.push("/login");
+    await fetch('/api/auth', { method: 'DELETE' });
+    router.push('/login');
   };
 
-  const handleNewInspection = () => {
-    router.push("/inspection/new");
-  };
+  const filteredInspections = activeTab === 'pending'
+    ? inspections.filter(i => i.status !== 'approved' && i.status !== 'rejected')
+    : inspections;
 
-  const handleViewInspection = (id: number) => {
-    router.push(`/inspection/${id}`);
-  };
-
-  if (!user) {
-    return <div className="min-h-screen flex items-center justify-center">加载中...</div>;
-  }
+  const getStatusInfo = (status: string) => STATUS_MAP[status] || { label: status, cls: 'status-draft' };
 
   return (
-    <>
-      <PWARegister />
-      <InstallPrompt />
-      <div className="min-h-screen bg-gray-50">
+    <div style={{ minHeight: '100vh', background: '#f5f5f5' }}>
       {/* Header */}
-      <header className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center">
-              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-            <div>
-              <h1 className="text-lg font-bold">首件核对系统</h1>
-              <p className="text-xs text-gray-500">化妆品生产检验管理</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-4">
-            <div className="text-right">
-              <p className="text-sm font-medium">{user.name}</p>
-              <Badge variant="outline" className="text-xs">
-                {ROLE_NAMES[user.role]}
-              </Badge>
-            </div>
-            {user.role === "admin" && (
-              <Button variant="outline" size="sm" onClick={() => router.push("/admin")}>
-                用户管理
-              </Button>
-            )}
-            <Button variant="outline" size="sm" onClick={handleLogout}>
-              退出
-            </Button>
-          </div>
+      <div className="header-bar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div>
+          <div className="title">检验记录</div>
+          <div className="sub">化妆品首件核对系统</div>
         </div>
-      </header>
-
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 py-6">
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm text-gray-500">待审核</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-2xl font-bold text-orange-600">
-                {inspections.filter((i) => i.status.includes("review")).length}
-              </p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm text-gray-500">已通过</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-2xl font-bold text-green-600">
-                {inspections.filter((i) => i.status === "approved").length}
-              </p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm text-gray-500">已驳回</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-2xl font-bold text-red-600">
-                {inspections.filter((i) => i.status === "rejected").length}
-              </p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm text-gray-500">总记录</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-2xl font-bold text-blue-600">{inspections.length}</p>
-            </CardContent>
-          </Card>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          {user && (
+            <span style={{ fontSize: '12px', background: 'rgba(255,255,255,0.2)', padding: '4px 10px', borderRadius: '12px' }}>
+              {user.name} · {ROLE_LABELS[user.role] || user.role}
+            </span>
+          )}
+          <button onClick={handleLogout} style={{ background: 'rgba(255,255,255,0.2)', border: 'none', color: '#fff', padding: '6px 12px', borderRadius: '8px', fontSize: '12px', cursor: 'pointer' }}>
+            退出
+          </button>
         </div>
+      </div>
 
-        {/* Actions */}
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold">检验记录</h2>
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              onClick={() => {
-                const params = new URLSearchParams();
-                window.open(`/api/export?${params}`, "_blank");
-              }}
-            >
-              导出记录
-            </Button>
-            {(user.role === "assistant" || user.role === "admin") && (
-              <Button onClick={handleNewInspection}>新建检验</Button>
-            )}
-          </div>
+      {/* Tabs */}
+      <div className="tab-bar">
+        <div className={`tab ${activeTab === 'pending' ? 'active' : ''}`} onClick={() => setActiveTab('pending')}>
+          待处理
         </div>
+        <div className={`tab ${activeTab === 'all' ? 'active' : ''}`} onClick={() => setActiveTab('all')}>
+          全部记录
+        </div>
+      </div>
 
-        {/* Inspection List */}
-        {loading ? (
-          <div className="text-center py-12 text-gray-500">加载中...</div>
-        ) : inspections.length === 0 ? (
-          <div className="text-center py-12 text-gray-500">暂无检验记录</div>
-        ) : (
-          <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-            <table className="w-full">
-              <thead className="bg-gray-50 border-b">
-                <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">ID</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">日期</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">产品信息</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">辅助人员</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">状态</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">操作</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {inspections.map((inspection) => (
-                  <tr key={inspection.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 text-sm">#{inspection.id}</td>
-                    <td className="px-4 py-3 text-sm text-gray-500">
-                      {inspection.inspection_date ? new Date(inspection.inspection_date).toLocaleDateString("zh-CN") : "-"}
-                    </td>
-                    <td className="px-4 py-3">
-                      <div>
-                        <p className="text-sm font-medium">{inspection.product_name}</p>
-                        <p className="text-xs text-gray-500">
-                          {inspection.product_code} | 色号: {inspection.color_number}
-                        </p>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-sm">{inspection.assistant_name}</td>
-                    <td className="px-4 py-3">
-                      <Badge className={STATUS_COLORS[inspection.status]}>
-                        {STATUS_NAMES[inspection.status]}
-                      </Badge>
-                    </td>
-                    <td className="px-4 py-3">
-                      <Button variant="outline" size="sm" onClick={() => handleViewInspection(inspection.id)}>
-                        查看
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+      {/* Action Buttons */}
+      <div style={{ padding: '12px', display: 'flex', gap: '8px' }}>
+        <button className="btn-primary" style={{ flex: 1, padding: '12px', fontSize: '14px' }} onClick={() => router.push('/inspection/new')}>
+          + 新建检验
+        </button>
+        {user?.role === 'admin' && (
+          <button className="btn-secondary" style={{ width: 'auto', padding: '12px 16px' }} onClick={() => router.push('/admin')}>
+            ️ 管理
+          </button>
         )}
-      </main>
+      </div>
+
+      {/* List */}
+      <div className="section">
+        {loading ? (
+          <div style={{ textAlign: 'center', padding: '40px', color: '#999' }}>加载中...</div>
+        ) : filteredInspections.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '40px', color: '#999' }}>
+            <div style={{ fontSize: '48px', marginBottom: '12px' }}>📋</div>
+            <div style={{ fontSize: '14px' }}>暂无检验记录</div>
+          </div>
+        ) : (
+          filteredInspections.map((item) => {
+            const statusInfo = getStatusInfo(item.status);
+            return (
+              <div key={item.id} className="card" onClick={() => router.push(`/inspection/${item.id}`)} style={{ cursor: 'pointer' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
+                  <div>
+                    <div style={{ fontSize: '15px', fontWeight: '600', color: '#212121' }}>{item.product_name}</div>
+                    <div style={{ fontSize: '12px', color: '#999', marginTop: '2px' }}>{item.inspection_date || item.created_at?.split('T')[0]}</div>
+                  </div>
+                  <span className={`status-badge ${statusInfo.cls}`}>{statusInfo.label}</span>
+                </div>
+                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '8px' }}>
+                  <span className="product-tag tag-blue">{item.product_code}</span>
+                  <span className="product-tag tag-orange">{item.color_number}</span>
+                  <span className="product-tag tag-gray">{item.batch_number}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px', color: '#999' }}>
+                  <span>提交人: {item.created_by_name}</span>
+                  {item.result && (
+                    <span style={{ color: item.result === 'pass' ? '#2e7d32' : '#d32f2f', fontWeight: '500' }}>
+                      {item.result === 'pass' ? '✅ 通过' : '❌ 不通过'}
+                    </span>
+                  )}
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
     </div>
-    </>
   );
 }

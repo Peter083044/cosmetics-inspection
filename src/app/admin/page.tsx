@@ -1,459 +1,377 @@
-"use client";
+'use client';
 
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 
 interface User {
   id: number;
   username: string;
   name: string;
   role: string;
-  created_at: string;
 }
 
-const ROLE_NAMES: Record<string, string> = {
-  assistant: "辅助",
-  line_leader: "线长",
-  supervisor: "主管",
-  qc: "QC",
-  admin: "管理员",
+interface CurrentUser {
+  id: number;
+  username: string;
+  name: string;
+  role: string;
+}
+
+const ROLE_LABELS: Record<string, string> = {
+  assistant: '辅助',
+  line_leader: '线长',
+  supervisor: '主管',
+  qc: 'QC',
+  admin: '管理员',
+};
+
+const ROLE_COLORS: Record<string, string> = {
+  assistant: '#2196F3',
+  line_leader: '#FF9800',
+  supervisor: '#9C27B0',
+  qc: '#4CAF50',
+  admin: '#F44336',
 };
 
 export default function AdminPage() {
   const router = useRouter();
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<CurrentUser | null>(null);
   const [users, setUsers] = useState<User[]>([]);
+  const [activeTab, setActiveTab] = useState<'personnel' | 'export'>('personnel');
   const [loading, setLoading] = useState(true);
-  const [showAddDialog, setShowAddDialog] = useState(false);
-  const [showBatchDialog, setShowBatchDialog] = useState(false);
-  const [newUser, setNewUser] = useState({
-    username: "",
-    password: "",
-    name: "",
-    role: "assistant",
-  });
-  const [batchConfig, setBatchConfig] = useState({
-    assistant_count: 40,
-    line_leader_count: 30,
-    supervisor_count: 5,
-    qc_count: 15,
-    password: "pass123",
-  });
-  const [batchProgress, setBatchProgress] = useState<string>("");
+
+  // Add user form
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [newUsername, setNewUsername] = useState('');
+  const [newName, setNewName] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [newRole, setNewRole] = useState('assistant');
+
+  // Batch create
+  const [showBatchForm, setShowBatchForm] = useState(false);
+  const [batchRole, setBatchRole] = useState('assistant');
+  const [batchCount, setBatchCount] = useState(10);
+  const [batchPassword, setBatchPassword] = useState('pass123');
+
+  // Export
+  const [exportType, setExportType] = useState<'csv' | 'excel'>('csv');
+  const [exportStatus, setExportStatus] = useState('all');
+  const [exportStartDate, setExportStartDate] = useState('');
+  const [exportEndDate, setExportEndDate] = useState('');
 
   useEffect(() => {
-    checkAuth();
+    loadData();
   }, []);
 
-  const checkAuth = async () => {
+  const loadData = async () => {
     try {
-      const res = await fetch("/api/auth");
-      if (!res.ok) {
-        router.push("/login");
-        return;
-      }
-      const data = await res.json();
-      if (data.user.role !== "admin") {
-        router.push("/dashboard");
-        return;
-      }
-      setUser(data.user);
-      loadUsers();
-    } catch {
-      router.push("/login");
-    }
-  };
+      const [authRes, usersRes] = await Promise.all([
+        fetch('/api/auth'),
+        fetch('/api/users'),
+      ]);
+      const authData = await authRes.json();
+      const usersData = await usersRes.json();
 
-  const loadUsers = async () => {
-    try {
-      const res = await fetch("/api/users");
-      if (res.ok) {
-        const data = await res.json();
-        setUsers(data.data || []);
+      if (authData.success) {
+        setUser(authData.user);
+        if (authData.user.role !== 'admin') {
+          router.push('/dashboard');
+          return;
+        }
+      } else {
+        router.push('/login');
+        return;
       }
-    } catch (error) {
-      console.error("Load users error:", error);
+
+      if (usersData.success) setUsers(usersData.data || []);
+    } catch {
+      // ignore
     } finally {
       setLoading(false);
     }
   };
 
   const handleAddUser = async () => {
-    if (!newUser.username || !newUser.password || !newUser.name) {
-      alert("请填写完整信息");
+    if (!newUsername || !newName || !newPassword) {
+      alert('请填写完整信息');
       return;
     }
-
     try {
-      const res = await fetch("/api/users", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(newUser),
+      const res = await fetch('/api/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: newUsername, name: newName, password: newPassword, role: newRole }),
       });
-
-      if (!res.ok) {
-        const data = await res.json();
-        alert(data.error || "添加失败");
-        return;
+      const data = await res.json();
+      if (data.success) {
+        alert('用户添加成功');
+        setShowAddForm(false);
+        setNewUsername('');
+        setNewName('');
+        setNewPassword('');
+        loadData();
+      } else {
+        alert(data.error || '添加失败');
       }
-
-      alert("用户添加成功");
-      setShowAddDialog(false);
-      setNewUser({ username: "", password: "", name: "", role: "assistant" });
-      loadUsers();
     } catch {
-      alert("网络错误");
+      alert('网络错误');
+    }
+  };
+
+  const handleDeleteUser = async (userId: number) => {
+    if (!confirm('确定删除该用户？')) return;
+    try {
+      const res = await fetch(`/api/users/${userId}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (data.success) {
+        alert('删除成功');
+        loadData();
+      } else {
+        alert(data.error || '删除失败');
+      }
+    } catch {
+      alert('网络错误');
     }
   };
 
   const handleBatchCreate = async () => {
-    setBatchProgress("正在批量创建账号...");
+    if (batchCount < 1 || batchCount > 100) {
+      alert('数量必须在1-100之间');
+      return;
+    }
     try {
-      const res = await fetch("/api/users/batch", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(batchConfig),
+      const res = await fetch('/api/users/batch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role: batchRole, count: batchCount, password: batchPassword }),
       });
-
-      if (!res.ok) {
-        const data = await res.json();
-        setBatchProgress("");
-        alert(data.error || "批量创建失败");
-        return;
-      }
-
       const data = await res.json();
-      setBatchProgress("");
-      setShowBatchDialog(false);
-      alert(`批量创建成功！\n${data.message}`);
-      loadUsers();
+      if (data.success) {
+        alert(`成功创建 ${data.data.created} 个账号`);
+        setShowBatchForm(false);
+        loadData();
+      } else {
+        alert(data.error || '创建失败');
+      }
     } catch {
-      setBatchProgress("");
-      alert("网络错误");
+      alert('网络错误');
     }
   };
 
-  const handleDeleteUser = async (id: number) => {
-    if (!confirm("确认删除此用户？")) return;
+  const handleExport = async () => {
+    const params = new URLSearchParams({ type: exportType });
+    if (exportStatus !== 'all') params.set('status', exportStatus);
+    if (exportStartDate) params.set('start_date', exportStartDate);
+    if (exportEndDate) params.set('end_date', exportEndDate);
 
     try {
-      const res = await fetch(`/api/users?id=${id}`, { method: "DELETE" });
-      if (!res.ok) {
-        const data = await res.json();
-        alert(data.error || "删除失败");
-        return;
+      const res = await fetch(`/api/export?${params.toString()}`);
+      if (res.ok) {
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `inspection_export_${new Date().toISOString().split('T')[0]}.${exportType === 'csv' ? 'csv' : 'xlsx'}`;
+        a.click();
+        URL.revokeObjectURL(url);
+      } else {
+        alert('导出失败');
       }
-      alert("用户已删除");
-      loadUsers();
     } catch {
-      alert("网络错误");
+      alert('网络错误');
     }
   };
 
-  // 统计各角色人数
-  const roleCounts = {
-    assistant: users.filter((u) => u.role === "assistant").length,
-    line_leader: users.filter((u) => u.role === "line_leader").length,
-    supervisor: users.filter((u) => u.role === "supervisor").length,
-    qc: users.filter((u) => u.role === "qc").length,
-    admin: users.filter((u) => u.role === "admin").length,
-  };
+  const roleCounts = users.reduce((acc, u) => {
+    acc[u.role] = (acc[u.role] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
 
-  if (!user) {
-    return <div className="min-h-screen flex items-center justify-center">加载中...</div>;
+  if (loading) {
+    return (
+      <div style={{ minHeight: '100vh', background: '#f5f5f5', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ color: '#999' }}>加载中...</div>
+      </div>
+    );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div style={{ minHeight: '100vh', background: '#f5f5f5' }}>
       {/* Header */}
-      <header className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Button variant="ghost" size="sm" onClick={() => router.push("/dashboard")}>
-              ← 返回
-            </Button>
-            <h1 className="text-lg font-bold">用户管理</h1>
-          </div>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={() => setShowBatchDialog(true)}>
-              批量创建账号
-            </Button>
-            <Button onClick={() => setShowAddDialog(true)}>添加单个用户</Button>
-          </div>
+      <div className="header-bar" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <button onClick={() => router.back()} style={{ background: 'none', border: 'none', color: '#fff', fontSize: '20px', cursor: 'pointer', padding: '4px' }}>
+          ←
+        </button>
+        <div className="title" style={{ flex: 1 }}>管理后台</div>
+      </div>
+
+      {/* Tabs */}
+      <div className="tab-bar">
+        <div className={`tab ${activeTab === 'personnel' ? 'active' : ''}`} onClick={() => setActiveTab('personnel')}>
+          人员管理
         </div>
-      </header>
-
-      <main className="max-w-7xl mx-auto px-4 py-6">
-        {/* 角色统计卡片 */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
-          <Card className="bg-blue-50 border-blue-200">
-            <CardContent className="pt-4">
-              <div className="text-center">
-                <div className="text-2xl font-bold text-blue-600">{roleCounts.assistant}</div>
-                <div className="text-sm text-blue-600">辅助</div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="bg-green-50 border-green-200">
-            <CardContent className="pt-4">
-              <div className="text-center">
-                <div className="text-2xl font-bold text-green-600">{roleCounts.line_leader}</div>
-                <div className="text-sm text-green-600">线长</div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="bg-purple-50 border-purple-200">
-            <CardContent className="pt-4">
-              <div className="text-center">
-                <div className="text-2xl font-bold text-purple-600">{roleCounts.supervisor}</div>
-                <div className="text-sm text-purple-600">主管</div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="bg-orange-50 border-orange-200">
-            <CardContent className="pt-4">
-              <div className="text-center">
-                <div className="text-2xl font-bold text-orange-600">{roleCounts.qc}</div>
-                <div className="text-sm text-orange-600">QC</div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="bg-red-50 border-red-200">
-            <CardContent className="pt-4">
-              <div className="text-center">
-                <div className="text-2xl font-bold text-red-600">{roleCounts.admin}</div>
-                <div className="text-sm text-red-600">管理员</div>
-              </div>
-            </CardContent>
-          </Card>
+        <div className={`tab ${activeTab === 'export' ? 'active' : ''}`} onClick={() => setActiveTab('export')}>
+          数据导出
         </div>
+      </div>
 
-        {loading ? (
-          <div className="text-center py-12 text-gray-500">加载中...</div>
-        ) : (
-          <Card>
-            <CardHeader>
-              <CardTitle>用户列表</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-gray-50 border-b">
-                    <tr>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">ID</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">用户名</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">姓名</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">角色</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">创建时间</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">操作</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-200">
-                    {users.map((u) => (
-                      <tr key={u.id} className="hover:bg-gray-50">
-                        <td className="px-4 py-3 text-sm">{u.id}</td>
-                        <td className="px-4 py-3 text-sm font-medium">{u.username}</td>
-                        <td className="px-4 py-3 text-sm">{u.name}</td>
-                        <td className="px-4 py-3">
-                          <Badge variant="outline">{ROLE_NAMES[u.role]}</Badge>
-                        </td>
-                        <td className="px-4 py-3 text-sm text-gray-500">
-                          {new Date(u.created_at).toLocaleString("zh-CN")}
-                        </td>
-                        <td className="px-4 py-3">
-                          {u.username !== "admin" && (
-                            <Button variant="outline" size="sm" onClick={() => handleDeleteUser(u.id)}>
-                              删除
-                            </Button>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-      </main>
+      {activeTab === 'personnel' && (
+        <>
+          {/* Role Stats */}
+          <div className="section">
+            <div className="section-title">👥 人员统计</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
+              {Object.entries(ROLE_LABELS).filter(([k]) => k !== 'admin').map(([role, label]) => (
+                <div key={role} className="card" style={{ padding: '12px', textAlign: 'center' }}>
+                  <div style={{ fontSize: '24px', fontWeight: '700', color: ROLE_COLORS[role] }}>{roleCounts[role] || 0}</div>
+                  <div style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>{label}</div>
+                </div>
+              ))}
+            </div>
+          </div>
 
-      {/* Add User Dialog */}
-      {showAddDialog && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <Card className="w-full max-w-md mx-4">
-            <CardHeader>
-              <CardTitle>添加用户</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label>用户名</Label>
-                <Input
-                  value={newUser.username}
-                  onChange={(e) => setNewUser({ ...newUser, username: e.target.value })}
-                  placeholder="请输入用户名"
-                />
+          {/* Action Buttons */}
+          <div style={{ padding: '0 12px', display: 'flex', gap: '8px', marginBottom: '12px' }}>
+            <button className="btn-primary" style={{ flex: 1, padding: '10px' }} onClick={() => setShowAddForm(true)}>
+              + 添加用户
+            </button>
+            <button className="btn-secondary" style={{ flex: 1, padding: '10px' }} onClick={() => setShowBatchForm(true)}>
+              批量创建
+            </button>
+          </div>
+
+          {/* User List */}
+          <div className="section">
+            <div className="section-title">📋 用户列表</div>
+            {users.map((u) => (
+              <div key={u.id} className="card">
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <div style={{ fontSize: '14px', fontWeight: '600' }}>{u.name}</div>
+                    <div style={{ fontSize: '12px', color: '#999' }}>{u.username}</div>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span className="role-tag" style={{ background: ROLE_COLORS[u.role] }}>{ROLE_LABELS[u.role]}</span>
+                    {u.role !== 'admin' && (
+                      <button onClick={() => handleDeleteUser(u.id)} style={{ background: 'none', border: 'none', color: '#d32f2f', cursor: 'pointer', fontSize: '16px' }}>
+                        
+                      </button>
+                    )}
+                  </div>
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label>密码</Label>
-                <Input
-                  type="password"
-                  value={newUser.password}
-                  onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
-                  placeholder="请输入密码"
-                />
+            ))}
+          </div>
+        </>
+      )}
+
+      {activeTab === 'export' && (
+        <div className="section">
+          <div className="section-title">📊 数据导出</div>
+          <div className="card">
+            <div style={{ marginBottom: '12px' }}>
+              <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '4px' }}>导出格式</label>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button className={`btn-secondary ${exportType === 'csv' ? 'active' : ''}`} onClick={() => setExportType('csv')} style={{ flex: 1 }}>
+                  CSV
+                </button>
+                <button className={`btn-secondary ${exportType === 'excel' ? 'active' : ''}`} onClick={() => setExportType('excel')} style={{ flex: 1 }}>
+                  Excel
+                </button>
               </div>
-              <div className="space-y-2">
-                <Label>姓名</Label>
-                <Input
-                  value={newUser.name}
-                  onChange={(e) => setNewUser({ ...newUser, name: e.target.value })}
-                  placeholder="请输入姓名"
-                />
+            </div>
+            <div style={{ marginBottom: '12px' }}>
+              <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '4px' }}>状态筛选</label>
+              <select className="input-box" value={exportStatus} onChange={(e) => setExportStatus(e.target.value)}>
+                <option value="all">全部状态</option>
+                <option value="approved">已通过</option>
+                <option value="rejected">已驳回</option>
+                <option value="line_leader_review">待线长审核</option>
+                <option value="supervisor_review">待主管审核</option>
+                <option value="qc_review">待QC审核</option>
+              </select>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '12px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '4px' }}>开始日期</label>
+                <input className="input-box" type="date" value={exportStartDate} onChange={(e) => setExportStartDate(e.target.value)} />
               </div>
-              <div className="space-y-2">
-                <Label>角色</Label>
-                <Select
-                  value={newUser.role}
-                  onValueChange={(value) => setNewUser({ ...newUser, role: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="assistant">辅助</SelectItem>
-                    <SelectItem value="line_leader">线长</SelectItem>
-                    <SelectItem value="supervisor">主管</SelectItem>
-                    <SelectItem value="qc">QC</SelectItem>
-                    <SelectItem value="admin">管理员</SelectItem>
-                  </SelectContent>
-                </Select>
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '4px' }}>结束日期</label>
+                <input className="input-box" type="date" value={exportEndDate} onChange={(e) => setExportEndDate(e.target.value)} />
               </div>
-              <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={() => setShowAddDialog(false)}>
-                  取消
-                </Button>
-                <Button onClick={handleAddUser}>添加</Button>
-              </div>
-            </CardContent>
-          </Card>
+            </div>
+            <button className="btn-primary" onClick={handleExport} style={{ width: '100%', padding: '12px' }}>
+              📥 导出数据
+            </button>
+          </div>
         </div>
       )}
 
-      {/* Batch Create Dialog */}
-      {showBatchDialog && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <Card className="w-full max-w-lg mx-4">
-            <CardHeader>
-              <CardTitle>批量创建账号</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                <p className="text-sm text-blue-700">
-                  将根据以下配置批量创建账号。用户名格式为：角色前缀+序号（如 assistant1, assistant2...）
-                </p>
-              </div>
-              
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>辅助人员数量</Label>
-                  <Input
-                    type="number"
-                    min="0"
-                    value={batchConfig.assistant_count}
-                    onChange={(e) => setBatchConfig({ ...batchConfig, assistant_count: parseInt(e.target.value) || 0 })}
-                  />
-                  <p className="text-xs text-gray-500">当前: {roleCounts.assistant} 人</p>
-                </div>
-                <div className="space-y-2">
-                  <Label>线长数量</Label>
-                  <Input
-                    type="number"
-                    min="0"
-                    value={batchConfig.line_leader_count}
-                    onChange={(e) => setBatchConfig({ ...batchConfig, line_leader_count: parseInt(e.target.value) || 0 })}
-                  />
-                  <p className="text-xs text-gray-500">当前: {roleCounts.line_leader} 人</p>
-                </div>
-                <div className="space-y-2">
-                  <Label>主管数量</Label>
-                  <Input
-                    type="number"
-                    min="0"
-                    value={batchConfig.supervisor_count}
-                    onChange={(e) => setBatchConfig({ ...batchConfig, supervisor_count: parseInt(e.target.value) || 0 })}
-                  />
-                  <p className="text-xs text-gray-500">当前: {roleCounts.supervisor} 人</p>
-                </div>
-                <div className="space-y-2">
-                  <Label>QC数量</Label>
-                  <Input
-                    type="number"
-                    min="0"
-                    value={batchConfig.qc_count}
-                    onChange={(e) => setBatchConfig({ ...batchConfig, qc_count: parseInt(e.target.value) || 0 })}
-                  />
-                  <p className="text-xs text-gray-500">当前: {roleCounts.qc} 人</p>
-                </div>
-              </div>
+      {/* Add User Modal */}
+      {showAddForm && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' }}>
+          <div className="card" style={{ width: '100%', maxWidth: '360px' }}>
+            <div style={{ fontSize: '16px', fontWeight: '600', marginBottom: '12px' }}>添加用户</div>
+            <div style={{ marginBottom: '10px' }}>
+              <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '4px' }}>用户名</label>
+              <input className="input-box" type="text" placeholder="登录用户名" value={newUsername} onChange={(e) => setNewUsername(e.target.value)} />
+            </div>
+            <div style={{ marginBottom: '10px' }}>
+              <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '4px' }}>姓名</label>
+              <input className="input-box" type="text" placeholder="真实姓名" value={newName} onChange={(e) => setNewName(e.target.value)} />
+            </div>
+            <div style={{ marginBottom: '10px' }}>
+              <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '4px' }}>密码</label>
+              <input className="input-box" type="password" placeholder="登录密码" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} />
+            </div>
+            <div style={{ marginBottom: '12px' }}>
+              <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '4px' }}>角色</label>
+              <select className="input-box" value={newRole} onChange={(e) => setNewRole(e.target.value)}>
+                <option value="assistant">辅助</option>
+                <option value="line_leader">线长</option>
+                <option value="supervisor">主管</option>
+                <option value="qc">QC</option>
+              </select>
+            </div>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button className="btn-secondary" onClick={() => setShowAddForm(false)} style={{ flex: 1 }}>取消</button>
+              <button className="btn-primary" onClick={handleAddUser} style={{ flex: 1 }}>确认添加</button>
+            </div>
+          </div>
+        </div>
+      )}
 
-              <div className="space-y-2">
-                <Label>统一密码</Label>
-                <Input
-                  value={batchConfig.password}
-                  onChange={(e) => setBatchConfig({ ...batchConfig, password: e.target.value })}
-                  placeholder="所有新账号的默认密码"
-                />
-              </div>
-
-              <div className="bg-gray-50 border rounded-lg p-3">
-                <p className="text-sm font-medium mb-2">将创建以下账号：</p>
-                <ul className="text-sm text-gray-600 space-y-1">
-                  {batchConfig.assistant_count > 0 && (
-                    <li>• 辅助人员 {batchConfig.assistant_count} 人 (assistant{roleCounts.assistant + 1} ~ assistant{roleCounts.assistant + batchConfig.assistant_count})</li>
-                  )}
-                  {batchConfig.line_leader_count > 0 && (
-                    <li>• 线长 {batchConfig.line_leader_count} 人 (leader{roleCounts.line_leader + 1} ~ leader{roleCounts.line_leader + batchConfig.line_leader_count})</li>
-                  )}
-                  {batchConfig.supervisor_count > 0 && (
-                    <li>• 主管 {batchConfig.supervisor_count} 人 (supervisor{roleCounts.supervisor + 1} ~ supervisor{roleCounts.supervisor + batchConfig.supervisor_count})</li>
-                  )}
-                  {batchConfig.qc_count > 0 && (
-                    <li>• QC {batchConfig.qc_count} 人 (qc{roleCounts.qc + 1} ~ qc{roleCounts.qc + batchConfig.qc_count})</li>
-                  )}
-                </ul>
-                <p className="text-sm text-gray-500 mt-2">
-                  总计: {batchConfig.assistant_count + batchConfig.line_leader_count + batchConfig.supervisor_count + batchConfig.qc_count} 人
-                </p>
-              </div>
-
-              {batchProgress && (
-                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-                  <p className="text-sm text-yellow-700">{batchProgress}</p>
-                </div>
-              )}
-
-              <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={() => setShowBatchDialog(false)} disabled={!!batchProgress}>
-                  取消
-                </Button>
-                <Button onClick={handleBatchCreate} disabled={!!batchProgress}>
-                  确认创建
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+      {/* Batch Create Modal */}
+      {showBatchForm && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' }}>
+          <div className="card" style={{ width: '100%', maxWidth: '360px' }}>
+            <div style={{ fontSize: '16px', fontWeight: '600', marginBottom: '12px' }}>批量创建账号</div>
+            <div style={{ marginBottom: '10px' }}>
+              <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '4px' }}>角色</label>
+              <select className="input-box" value={batchRole} onChange={(e) => setBatchRole(e.target.value)}>
+                <option value="assistant">辅助</option>
+                <option value="line_leader">线长</option>
+                <option value="supervisor">主管</option>
+                <option value="qc">QC</option>
+              </select>
+            </div>
+            <div style={{ marginBottom: '10px' }}>
+              <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '4px' }}>创建数量</label>
+              <input className="input-box" type="number" min="1" max="100" value={batchCount} onChange={(e) => setBatchCount(parseInt(e.target.value) || 1)} />
+            </div>
+            <div style={{ marginBottom: '12px' }}>
+              <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '4px' }}>统一密码</label>
+              <input className="input-box" type="text" value={batchPassword} onChange={(e) => setBatchPassword(e.target.value)} />
+            </div>
+            <div style={{ padding: '8px', background: '#f5f5f5', borderRadius: '6px', fontSize: '12px', color: '#666', marginBottom: '12px' }}>
+              将创建 {batchCount} 个{ROLE_LABELS[batchRole]}账号，用户名自动生成（如 assistant1, assistant2...）
+            </div>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button className="btn-secondary" onClick={() => setShowBatchForm(false)} style={{ flex: 1 }}>取消</button>
+              <button className="btn-primary" onClick={handleBatchCreate} style={{ flex: 1 }}>确认创建</button>
+            </div>
+          </div>
         </div>
       )}
     </div>

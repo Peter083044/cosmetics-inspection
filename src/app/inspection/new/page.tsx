@@ -1,13 +1,7 @@
-"use client";
+'use client';
 
-import { useState, useEffect, useRef } from "react";
-import { useRouter } from "next/navigation";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 
 interface User {
   id: number;
@@ -16,498 +10,304 @@ interface User {
   role: string;
 }
 
-interface PhotoComparison {
+interface Comparison {
   side: number;
-  standard: string | null;
-  actual: string | null;
-  result: "pass" | "fail" | null;
+  side_name: string;
+  standard: string;
+  actual: string;
+  result: string;
   difference: string;
 }
 
-const SIDE_NAMES = ["正面", "背面", "左侧", "右侧", "顶部", "底部"];
+const SIDES = [
+  { id: 1, name: '正面' },
+  { id: 2, name: '背面' },
+  { id: 3, name: '左侧' },
+  { id: 4, name: '右侧' },
+  { id: 5, name: '顶部' },
+  { id: 6, name: '底部' },
+];
 
 export default function NewInspectionPage() {
   const router = useRouter();
-  const fileInputRefs = useRef<(HTMLInputElement | null)[]>([]);
   const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  // Product info
-  const [inspectionDate, setInspectionDate] = useState(new Date().toISOString().split("T")[0]);
-  const [productName, setProductName] = useState("");
-  const [productCode, setProductCode] = useState("");
-  const [colorNumber, setColorNumber] = useState("");
-  const [batchNumber, setBatchNumber] = useState("");
-  const [workOrderImage, setWorkOrderImage] = useState<string | null>(null);
+  // Form fields
+  const [inspectionDate, setInspectionDate] = useState('');
+  const [productName, setProductName] = useState('');
+  const [productCode, setProductCode] = useState('');
+  const [colorNumber, setColorNumber] = useState('');
+  const [batchNumber, setBatchNumber] = useState('');
+  const [instructionOrderImage, setInstructionOrderImage] = useState('');
 
-  // Photo comparisons (up to 6 sides)
-  const [comparisons, setComparisons] = useState<PhotoComparison[]>(
-    Array.from({ length: 6 }, (_, i) => ({
-      side: i + 1,
-      standard: null,
-      actual: null,
-      result: null,
-      difference: "",
-    }))
+  // Photo comparisons
+  const [comparisons, setComparisons] = useState<Comparison[]>(
+    SIDES.map(s => ({ side: s.id, side_name: s.name, standard: '', actual: '', result: 'pass', difference: '' }))
   );
 
-  // Result
-  const [overallResult, setOverallResult] = useState<"pass" | "fail" | null>(null);
-  const [resultSummary, setResultSummary] = useState("");
+  const [resultSummary, setResultSummary] = useState('');
 
   useEffect(() => {
-    checkAuth();
+    // Set today's date
+    const today = new Date().toISOString().split('T')[0];
+    setInspectionDate(today);
+
+    fetch('/api/auth')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) setUser(data.user);
+        else router.push('/login');
+      })
+      .catch(() => router.push('/login'));
   }, []);
 
-  const checkAuth = async () => {
-    try {
-      const res = await fetch("/api/auth");
-      if (!res.ok) {
-        router.push("/login");
-        return;
+  const handlePhotoUpload = (sideIndex: number, type: 'standard' | 'actual') => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+
+      const formData = new FormData();
+      formData.append('file', file);
+
+      try {
+        const res = await fetch('/api/upload', { method: 'POST', body: formData });
+        const data = await res.json();
+        if (data.success) {
+          setComparisons(prev => {
+            const next = [...prev];
+            next[sideIndex] = { ...next[sideIndex], [type]: data.url };
+            return next;
+          });
+        }
+      } catch {
+        alert('上传失败');
       }
-      const data = await res.json();
-      setUser(data.user);
-    } catch {
-      router.push("/login");
-    } finally {
-      setLoading(false);
-    }
+    };
+    input.click();
   };
 
-  const uploadFile = async (file: File): Promise<string> => {
-    const formData = new FormData();
-    formData.append("file", file);
-    const res = await fetch("/api/upload", { method: "POST", body: formData });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || "Upload failed");
-    return data.url;
-  };
+  const handleInstructionOrderUpload = () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
 
-  const handlePhotoUpload = async (
-    comparisonIndex: number,
-    type: "standard" | "actual",
-    file: File
-  ) => {
-    try {
-      const url = await uploadFile(file);
-      setComparisons((prev) => {
-        const updated = [...prev];
-        updated[comparisonIndex] = { ...updated[comparisonIndex], [type]: url };
-        return updated;
-      });
-    } catch (error) {
-      alert("上传失败，请重试");
-    }
-  };
+      const formData = new FormData();
+      formData.append('file', file);
 
-  const handleWorkOrderUpload = async (file: File) => {
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("type", "work_order");
-
-    try {
-      const res = await fetch("/api/upload", {
-        method: "POST",
-        body: formData,
-      });
-
-      if (!res.ok) {
-        alert("上传失败");
-        return;
+      try {
+        const res = await fetch('/api/upload', { method: 'POST', body: formData });
+        const data = await res.json();
+        if (data.success) {
+          setInstructionOrderImage(data.url);
+        }
+      } catch {
+        alert('上传失败');
       }
-
-      const data = await res.json();
-      setWorkOrderImage(data.url);
-    } catch {
-      alert("上传失败");
-    }
+    };
+    input.click();
   };
 
-  const handleResultChange = (index: number, result: "pass" | "fail") => {
-    setComparisons((prev) => {
-      const updated = [...prev];
-      updated[index] = { ...updated[index], result };
-      return updated;
-    });
-  };
-
-  const handleDifferenceChange = (index: number, difference: string) => {
-    setComparisons((prev) => {
-      const updated = [...prev];
-      updated[index] = { ...updated[index], difference };
-      return updated;
+  const updateComparison = (index: number, field: keyof Comparison, value: string) => {
+    setComparisons(prev => {
+      const next = [...prev];
+      next[index] = { ...next[index], [field]: value };
+      return next;
     });
   };
 
   const handleSubmit = async () => {
     if (!productName || !productCode || !colorNumber) {
-      alert("请填写完整的产品信息");
+      alert('请填写产品名称、代码和色号');
       return;
     }
 
-    const filledComparisons = comparisons.filter((c) => c.standard || c.actual);
-    if (filledComparisons.length === 0) {
-      alert("请至少上传一组对比照片");
+    const activeComparisons = comparisons.filter(c => c.standard || c.actual);
+    if (activeComparisons.length === 0) {
+      alert('请至少上传一组照片');
       return;
     }
 
-    // Check all filled comparisons have results
-    const incomplete = filledComparisons.filter((c) => !c.result);
-    if (incomplete.length > 0) {
-      alert("请为每组对比照片选择判定结果");
-      return;
-    }
-
-    // Check all failed comparisons have difference descriptions
-    const failedWithoutDesc = filledComparisons.filter(
-      (c) => c.result === "fail" && !c.difference.trim()
-    );
-    if (failedWithoutDesc.length > 0) {
-      alert("请填写不合格项的差异说明");
-      return;
-    }
-
-    // Calculate overall result
-    const hasFail = filledComparisons.some((c) => c.result === "fail");
-    const result = hasFail ? "fail" : "pass";
-
-    // Generate summary
-    const failItems = filledComparisons.filter((c) => c.result === "fail");
-    let summary = "";
-    if (result === "pass") {
-      summary = "首件核对通过，所有对比面均符合标样要求。";
-    } else {
-      summary = "首件核对不通过，存在以下差异：\n";
-      failItems.forEach((item) => {
-        summary += `- ${SIDE_NAMES[item.side - 1]}：${item.difference}\n`;
-      });
-    }
-
-    setSubmitting(true);
+    const hasFail = activeComparisons.some(c => c.result === 'fail');
+    setLoading(true);
 
     try {
-      const res = await fetch("/api/inspections", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+      const res = await fetch('/api/inspections', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           inspection_date: inspectionDate,
           product_name: productName,
           product_code: productCode,
           color_number: colorNumber,
           batch_number: batchNumber,
-          work_order_image: workOrderImage,
-          comparisons: filledComparisons,
-          result,
-          result_summary: summary,
+          instruction_order_image: instructionOrderImage,
+          comparisons: activeComparisons,
+          result: hasFail ? 'fail' : 'pass',
+          result_summary: resultSummary || (hasFail ? '存在不通过项' : '全部通过'),
         }),
       });
 
-      if (!res.ok) {
-        const data = await res.json();
-        alert(data.error || "提交失败");
-        return;
+      const data = await res.json();
+      if (data.success) {
+        alert('检验记录已提交，等待线长审核');
+        router.push('/dashboard');
+      } else {
+        alert(data.error || '提交失败');
       }
-
-      alert("提交成功！已提交至线长审核");
-      router.push("/dashboard");
     } catch {
-      alert("网络错误，请稍后重试");
+      alert('网络错误');
     } finally {
-      setSubmitting(false);
+      setLoading(false);
     }
   };
 
-  if (loading) {
-    return <div className="min-h-screen flex items-center justify-center">加载中...</div>;
-  }
-
-  if (!user || (user.role !== "assistant" && user.role !== "admin")) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p>无权限访问此页面</p>
-      </div>
-    );
-  }
-
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div style={{ minHeight: '100vh', background: '#f5f5f5' }}>
       {/* Header */}
-      <header className="bg-white shadow-sm border-b sticky top-0 z-10">
-        <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Button variant="ghost" size="sm" onClick={() => router.push("/dashboard")}>
-              ← 返回
-            </Button>
-            <h1 className="text-lg font-bold">新建首件核对</h1>
+      <div className="header-bar" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <button onClick={() => router.back()} style={{ background: 'none', border: 'none', color: '#fff', fontSize: '20px', cursor: 'pointer', padding: '4px' }}>
+          ←
+        </button>
+        <div className="title" style={{ flex: 1 }}>新建检验</div>
+      </div>
+
+      {/* Section 1: Basic Info */}
+      <div className="section">
+        <div className="section-title">📋 基本信息</div>
+        <div className="card">
+          <div style={{ marginBottom: '12px' }}>
+            <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '4px' }}>检验日期</label>
+            <input className="input-box" type="date" value={inspectionDate} onChange={(e) => setInspectionDate(e.target.value)} />
           </div>
-          <Button onClick={handleSubmit} disabled={submitting}>
-            {submitting ? "提交中..." : "提交审核"}
-          </Button>
-        </div>
-      </header>
-
-      <main className="max-w-4xl mx-auto px-4 py-6 space-y-6">
-        {/* Step 1: Product Info */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Badge variant="outline" className="bg-blue-50">步骤1</Badge>
-              录入产品信息
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="date">日期 *</Label>
-              <Input
-                id="date"
-                type="date"
-                value={inspectionDate}
-                onChange={(e) => setInspectionDate(e.target.value)}
-              />
+          <div style={{ marginBottom: '12px' }}>
+            <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '4px' }}>产品名称 *</label>
+            <input className="input-box" type="text" placeholder="请输入产品名称" value={productName} onChange={(e) => setProductName(e.target.value)} />
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '12px' }}>
+            <div>
+              <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '4px' }}>产品代码 *</label>
+              <input className="input-box" type="text" placeholder="如 LP-001" value={productCode} onChange={(e) => setProductCode(e.target.value)} />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="productName">产品名称 *</Label>
-              <Input
-                id="productName"
-                value={productName}
-                onChange={(e) => setProductName(e.target.value)}
-                placeholder="如：柔雾唇膏"
-              />
+            <div>
+              <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '4px' }}>色号 *</label>
+              <input className="input-box" type="text" placeholder="如 C01" value={colorNumber} onChange={(e) => setColorNumber(e.target.value)} />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="productCode">产品代码 *</Label>
-              <Input
-                id="productCode"
-                value={productCode}
-                onChange={(e) => setProductCode(e.target.value)}
-                placeholder="如：LP-2024-001"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="colorNumber">色号 *</Label>
-              <Input
-                id="colorNumber"
-                value={colorNumber}
-                onChange={(e) => setColorNumber(e.target.value)}
-                placeholder="如：C03-玫瑰红"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="batchNumber">批号（选填，不参与比对）</Label>
-              <Input
-                id="batchNumber"
-                value={batchNumber}
-                onChange={(e) => setBatchNumber(e.target.value)}
-                placeholder="批号信息不作为核对依据"
-              />
-            </div>
-            <div className="space-y-2 md:col-span-2">
-              <Label>指令单照片（选填）</Label>
-              <div className="flex items-center gap-4">
-                <Input
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) handleWorkOrderUpload(file);
-                  }}
-                />
-                {workOrderImage && (
-                  <div className="relative w-20 h-20">
-                    <img
-                      src={workOrderImage}
-                      alt="指令单"
-                      className="w-full h-full object-cover rounded border"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setWorkOrderImage(null)}
-                      className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs"
-                    >
-                      ×
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Step 2: Photo Comparison */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Badge variant="outline" className="bg-blue-50">步骤2</Badge>
-              拍照对比（标样 vs 首件）
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            {comparisons.map((comp, index) => (
-              <div key={index} className="border rounded-lg p-4 space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="font-medium">{SIDE_NAMES[index]}对比</h3>
-                  {comp.result && (
-                    <Badge className={comp.result === "pass" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}>
-                      {comp.result === "pass" ? "通过" : "不通过"}
-                    </Badge>
-                  )}
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  {/* Standard Photo */}
-                  <div className="space-y-2">
-                    <Label className="text-sm text-gray-500">标样照片</Label>
-                    <div
-                      className="border-2 border-dashed rounded-lg h-40 flex items-center justify-center cursor-pointer hover:border-blue-400 transition-colors overflow-hidden"
-                      onClick={() => fileInputRefs.current[index * 2]?.click()}
-                    >
-                      {comp.standard ? (
-                        <img src={comp.standard} alt="标样" className="w-full h-full object-cover" />
-                      ) : (
-                        <div className="text-center text-gray-400">
-                          <svg className="w-8 h-8 mx-auto mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-                          </svg>
-                          <p className="text-xs">点击上传标样</p>
-                        </div>
-                      )}
-                    </div>
-                    <input
-                      ref={(el) => { fileInputRefs.current[index * 2] = el; }}
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={(e) => {
-                        if (e.target.files?.[0]) handlePhotoUpload(index, "standard", e.target.files[0]);
-                      }}
-                    />
-                  </div>
-
-                  {/* Actual Photo */}
-                  <div className="space-y-2">
-                    <Label className="text-sm text-gray-500">首件实物照片</Label>
-                    <div
-                      className="border-2 border-dashed rounded-lg h-40 flex items-center justify-center cursor-pointer hover:border-blue-400 transition-colors overflow-hidden"
-                      onClick={() => fileInputRefs.current[index * 2 + 1]?.click()}
-                    >
-                      {comp.actual ? (
-                        <img src={comp.actual} alt="首件" className="w-full h-full object-cover" />
-                      ) : (
-                        <div className="text-center text-gray-400">
-                          <svg className="w-8 h-8 mx-auto mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-                          </svg>
-                          <p className="text-xs">点击上传首件</p>
-                        </div>
-                      )}
-                    </div>
-                    <input
-                      ref={(el) => { fileInputRefs.current[index * 2 + 1] = el; }}
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={(e) => {
-                        if (e.target.files?.[0]) handlePhotoUpload(index, "actual", e.target.files[0]);
-                      }}
-                    />
-                  </div>
-                </div>
-
-                {/* Result Selection */}
-                {(comp.standard || comp.actual) && (
-                  <div className="space-y-2">
-                    <Label>判定结果</Label>
-                    <div className="flex gap-2">
-                      <Button
-                        variant={comp.result === "pass" ? "default" : "outline"}
-                        size="sm"
-                        className={comp.result === "pass" ? "bg-green-600 hover:bg-green-700" : ""}
-                        onClick={() => handleResultChange(index, "pass")}
-                      >
-                        通过
-                      </Button>
-                      <Button
-                        variant={comp.result === "fail" ? "default" : "outline"}
-                        size="sm"
-                        className={comp.result === "fail" ? "bg-red-600 hover:bg-red-700" : ""}
-                        onClick={() => handleResultChange(index, "fail")}
-                      >
-                        不通过
-                      </Button>
-                    </div>
-                  </div>
-                )}
-
-                {/* Difference Description */}
-                {comp.result === "fail" && (
-                  <div className="space-y-2">
-                    <Label>差异说明 *</Label>
-                    <Textarea
-                      value={comp.difference}
-                      onChange={(e) => handleDifferenceChange(index, e.target.value)}
-                      placeholder="请描述与标样的差异，如：颜色偏浅、印刷位置偏移等"
-                      rows={2}
-                    />
-                  </div>
-                )}
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-
-        {/* Step 3: Result Summary */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Badge variant="outline" className="bg-blue-50">步骤3</Badge>
-              核对结果
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {comparisons.some((c) => c.result) ? (
-              <div className="space-y-4">
-                <div className={`p-4 rounded-lg ${comparisons.some((c) => c.result === "fail") ? "bg-red-50 border border-red-200" : "bg-green-50 border border-green-200"}`}>
-                  <div className="flex items-center gap-2 mb-2">
-                    {comparisons.some((c) => c.result === "fail") ? (
-                      <>
-                        <svg className="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        <span className="font-medium text-red-700">核对结果：不通过</span>
-                      </>
-                    ) : (
-                      <>
-                        <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        <span className="font-medium text-green-700">核对结果：通过</span>
-                      </>
-                    )}
-                  </div>
-                  <p className="text-sm text-gray-700 whitespace-pre-line">
-                    {comparisons.some((c) => c.result === "fail")
-                      ? "存在以下差异：\n" +
-                        comparisons
-                          .filter((c) => c.result === "fail")
-                          .map((c) => `- ${SIDE_NAMES[c.side - 1]}：${c.difference}`)
-                          .join("\n")
-                      : "所有对比面均符合标样要求，批号信息已排除比对。"}
-                  </p>
-                </div>
-                <p className="text-xs text-gray-500">
-                  提交后将依次经过：辅助 → 线长审核 → 主管审核 → QC审核
-                </p>
+          </div>
+          <div style={{ marginBottom: '12px' }}>
+            <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '4px' }}>批号 <span style={{ color: '#999', fontSize: '11px' }}>(不参与比对)</span></label>
+            <input className="input-box" type="text" placeholder="请输入批号" value={batchNumber} onChange={(e) => setBatchNumber(e.target.value)} />
+          </div>
+          <div>
+            <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '4px' }}>工单/指令单照片</label>
+            {instructionOrderImage ? (
+              <div className="photo-preview" style={{ marginTop: '8px' }}>
+                <img src={instructionOrderImage} alt="工单" style={{ height: '100px' }} />
+                <button onClick={() => setInstructionOrderImage('')} style={{ position: 'absolute', top: '4px', right: '4px', background: 'rgba(0,0,0,0.6)', color: '#fff', border: 'none', borderRadius: '50%', width: '20px', height: '20px', cursor: 'pointer', fontSize: '12px' }}>✕</button>
               </div>
             ) : (
-              <p className="text-gray-500 text-center py-4">请先完成照片对比</p>
+              <div className="photo-upload-area" onClick={handleInstructionOrderUpload} style={{ marginTop: '8px', padding: '16px' }}>
+                <div className="icon">📄</div>
+                <div className="text">点击上传工单照片</div>
+              </div>
             )}
-          </CardContent>
-        </Card>
-      </main>
+          </div>
+        </div>
+      </div>
+
+      {/* Section 2: Photo Comparison */}
+      <div className="section">
+        <div className="section-title">📷 照片对比 <span style={{ fontSize: '12px', color: '#999', fontWeight: '400' }}>(最多6个面)</span></div>
+
+        {comparisons.map((comp, idx) => (
+          <div key={comp.side} className="card">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+              <span style={{ fontSize: '14px', fontWeight: '600' }}>{comp.side_name}</span>
+              <select
+                value={comp.result}
+                onChange={(e) => updateComparison(idx, 'result', e.target.value)}
+                style={{ padding: '4px 8px', borderRadius: '6px', border: '1px solid #e0e0e0', fontSize: '12px', background: comp.result === 'pass' ? '#e8f5e9' : '#ffebee', color: comp.result === 'pass' ? '#2e7d32' : '#d32f2f' }}
+              >
+                <option value="pass">✅ 通过</option>
+                <option value="fail">❌ 不通过</option>
+              </select>
+            </div>
+
+            <div className="comparison-row">
+              <div className="photo-side">
+                <div style={{ fontSize: '11px', color: '#999', marginBottom: '4px' }}>标样照片</div>
+                {comp.standard ? (
+                  <div className="photo-preview">
+                    <img src={comp.standard} alt="标样" />
+                    <button onClick={() => updateComparison(idx, 'standard', '')} style={{ position: 'absolute', top: '4px', right: '4px', background: 'rgba(0,0,0,0.6)', color: '#fff', border: 'none', borderRadius: '50%', width: '18px', height: '18px', cursor: 'pointer', fontSize: '10px' }}>✕</button>
+                  </div>
+                ) : (
+                  <div className="photo-upload-area" onClick={() => handlePhotoUpload(idx, 'standard')} style={{ padding: '12px' }}>
+                    <div style={{ fontSize: '24px' }}>📷</div>
+                    <div className="text" style={{ fontSize: '11px' }}>上传标样</div>
+                  </div>
+                )}
+              </div>
+              <div className="photo-side">
+                <div style={{ fontSize: '11px', color: '#999', marginBottom: '4px' }}>首件照片</div>
+                {comp.actual ? (
+                  <div className="photo-preview">
+                    <img src={comp.actual} alt="首件" />
+                    <button onClick={() => updateComparison(idx, 'actual', '')} style={{ position: 'absolute', top: '4px', right: '4px', background: 'rgba(0,0,0,0.6)', color: '#fff', border: 'none', borderRadius: '50%', width: '18px', height: '18px', cursor: 'pointer', fontSize: '10px' }}>✕</button>
+                  </div>
+                ) : (
+                  <div className="photo-upload-area" onClick={() => handlePhotoUpload(idx, 'actual')} style={{ padding: '12px' }}>
+                    <div style={{ fontSize: '24px' }}>📷</div>
+                    <div className="text" style={{ fontSize: '11px' }}>上传首件</div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {comp.result === 'fail' && (
+              <div style={{ marginTop: '8px' }}>
+                <label style={{ display: 'block', fontSize: '11px', color: '#d32f2f', marginBottom: '4px' }}>差异说明 *</label>
+                <textarea
+                  className="input-box"
+                  placeholder="请说明不通过的原因（颜色差异、外观差异等）"
+                  value={comp.difference}
+                  onChange={(e) => updateComparison(idx, 'difference', e.target.value)}
+                  rows={2}
+                  style={{ resize: 'vertical' }}
+                />
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* Section 3: Summary */}
+      <div className="section">
+        <div className="section-title"> 检验总结</div>
+        <div className="card">
+          <textarea
+            className="input-box"
+            placeholder="检验总结说明（可选）"
+            value={resultSummary}
+            onChange={(e) => setResultSummary(e.target.value)}
+            rows={3}
+            style={{ resize: 'vertical' }}
+          />
+        </div>
+      </div>
+
+      {/* Submit Button */}
+      <div style={{ padding: '12px 12px 24px 12px' }}>
+        <button className="btn-primary" onClick={handleSubmit} disabled={loading} style={{ opacity: loading ? 0.7 : 1 }}>
+          {loading ? '提交中...' : '提交检验 → 线长审核'}
+        </button>
+      </div>
     </div>
   );
 }

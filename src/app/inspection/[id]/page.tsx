@@ -1,12 +1,33 @@
-"use client";
+'use client';
 
-import { useState, useEffect } from "react";
-import { useRouter, useParams } from "next/navigation";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+
+interface Inspection {
+  id: number;
+  inspection_date: string;
+  product_name: string;
+  product_code: string;
+  color_number: string;
+  batch_number: string;
+  instruction_order_image?: string;
+  comparisons: Array<{
+    side: number;
+    side_name: string;
+    standard: string;
+    actual: string;
+    result: string;
+    difference: string;
+  }>;
+  result: string;
+  result_summary: string;
+  status: string;
+  created_by_name: string;
+  created_at: string;
+  reviewer_name?: string;
+  review_comment?: string;
+  reviewed_at?: string;
+}
 
 interface User {
   id: number;
@@ -15,431 +36,306 @@ interface User {
   role: string;
 }
 
-const ROLE_NAMES: Record<string, string> = {
-  assistant: "辅助",
-  line_leader: "线长",
-  supervisor: "主管",
-  qc: "QC",
-  admin: "管理员",
+const STATUS_LABELS: Record<string, string> = {
+  line_leader_review: '待线长审核',
+  supervisor_review: '待主管审核',
+  qc_review: '待QC审核',
+  approved: '已通过',
+  rejected: '已驳回',
 };
 
-const STATUS_NAMES: Record<string, string> = {
-  pending: "待提交",
-  line_leader_review: "线长审核中",
-  supervisor_review: "主管审核中",
-  qc_review: "QC审核中",
-  approved: "已通过",
-  rejected: "已驳回",
+const ROLE_LABELS: Record<string, string> = {
+  assistant: '辅助',
+  line_leader: '线长',
+  supervisor: '主管',
+  qc: 'QC',
+  admin: '管理员',
 };
 
-const STATUS_COLORS: Record<string, string> = {
-  pending: "bg-gray-100 text-gray-700",
-  line_leader_review: "bg-blue-100 text-blue-700",
-  supervisor_review: "bg-purple-100 text-purple-700",
-  qc_review: "bg-orange-100 text-orange-700",
-  approved: "bg-green-100 text-green-700",
-  rejected: "bg-red-100 text-red-700",
-};
-
-const SIDE_NAMES = ["正面", "背面", "左侧", "右侧", "顶部", "底部"];
-
-export default function InspectionDetailPage() {
+export default function InspectionDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
-  const params = useParams();
-  const id = params.id as string;
-
+  const [inspection, setInspection] = useState<Inspection | null>(null);
   const [user, setUser] = useState<User | null>(null);
-  const [inspection, setInspection] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [rejectReason, setRejectReason] = useState("");
-  const [showRejectDialog, setShowRejectDialog] = useState(false);
-  const [processing, setProcessing] = useState(false);
+  const [actionLoading, setActionLoading] = useState(false);
+  const [rejectReason, setRejectReason] = useState('');
+  const [showRejectModal, setShowRejectModal] = useState(false);
 
   useEffect(() => {
-    checkAuth();
+    loadData();
   }, []);
 
-  useEffect(() => {
-    if (user) {
-      loadInspection();
-    }
-  }, [user]);
-
-  const checkAuth = async () => {
+  const loadData = async () => {
     try {
-      const res = await fetch("/api/auth");
-      if (!res.ok) {
-        router.push("/login");
-        return;
-      }
-      const data = await res.json();
-      setUser(data.user);
-    } catch {
-      router.push("/login");
-    }
-  };
+      const [authRes, inspRes] = await Promise.all([
+        fetch('/api/auth'),
+        fetch(`/api/inspections?id=${(await params).id}`),
+      ]);
+      const authData = await authRes.json();
+      const inspData = await inspRes.json();
 
-  const loadInspection = async () => {
-    try {
-      const res = await fetch(`/api/inspections?id=${id}`);
-      if (!res.ok) {
-        alert("检验记录不存在");
-        router.push("/dashboard");
-        return;
-      }
-      const data = await res.json();
-      setInspection(data.data);
+      if (authData.success) setUser(authData.user);
+      else router.push('/login');
+
+      if (inspData.success && inspData.data) setInspection(inspData.data);
     } catch {
-      alert("加载失败");
+      // ignore
     } finally {
       setLoading(false);
     }
   };
 
-  const canApprove = () => {
-    if (!user || !inspection) return false;
-    if (user.role === "admin") return true;
-    if (user.role === "line_leader" && inspection.status === "line_leader_review") return true;
-    if (user.role === "supervisor" && inspection.status === "supervisor_review") return true;
-    if (user.role === "qc" && inspection.status === "qc_review") return true;
-    return false;
-  };
-
   const handleApprove = async () => {
-    if (!confirm("确认通过此检验？")) return;
-    setProcessing(true);
+    if (!inspection) return;
+    setActionLoading(true);
     try {
-      const res = await fetch(`/api/inspections/${id}/approve`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "approve" }),
+      const res = await fetch(`/api/inspections/${inspection.id}/approve`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'approved' }),
       });
-      if (!res.ok) {
-        const data = await res.json();
-        alert(data.error || "操作失败");
-        return;
+      const data = await res.json();
+      if (data.success) {
+        alert('审核通过');
+        loadData();
+      } else {
+        alert(data.error || '操作失败');
       }
-      alert("审核通过");
-      loadInspection();
     } catch {
-      alert("网络错误");
+      alert('网络错误');
     } finally {
-      setProcessing(false);
+      setActionLoading(false);
     }
   };
 
   const handleReject = async () => {
-    if (!rejectReason.trim()) {
-      alert("请填写驳回原因");
+    if (!inspection || !rejectReason) {
+      alert('请填写驳回原因');
       return;
     }
-    setProcessing(true);
+    setActionLoading(true);
     try {
-      const res = await fetch(`/api/inspections/${id}/approve`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "reject", reason: rejectReason }),
+      const res = await fetch(`/api/inspections/${inspection.id}/approve`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'rejected', comment: rejectReason }),
       });
-      if (!res.ok) {
-        const data = await res.json();
-        alert(data.error || "操作失败");
-        return;
+      const data = await res.json();
+      if (data.success) {
+        alert('已驳回');
+        setShowRejectModal(false);
+        setRejectReason('');
+        loadData();
+      } else {
+        alert(data.error || '操作失败');
       }
-      alert("已驳回");
-      setShowRejectDialog(false);
-      setRejectReason("");
-      loadInspection();
     } catch {
-      alert("网络错误");
+      alert('网络错误');
     } finally {
-      setProcessing(false);
+      setActionLoading(false);
     }
   };
 
+  const canReview = () => {
+    if (!user || !inspection) return false;
+    if (inspection.status === 'approved' || inspection.status === 'rejected') return false;
+    if (user.role === 'line_leader' && inspection.status === 'line_leader_review') return true;
+    if (user.role === 'supervisor' && inspection.status === 'supervisor_review') return true;
+    if (user.role === 'qc' && inspection.status === 'qc_review') return true;
+    if (user.role === 'admin') return true;
+    return false;
+  };
+
   if (loading) {
-    return <div className="min-h-screen flex items-center justify-center">加载中...</div>;
+    return (
+      <div style={{ minHeight: '100vh', background: '#f5f5f5', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ color: '#999' }}>加载中...</div>
+      </div>
+    );
   }
 
   if (!inspection) {
-    return <div className="min-h-screen flex items-center justify-center">记录不存在</div>;
-  }
-
-  let comparisons = [];
-  try {
-    comparisons = JSON.parse(inspection.comparisons || "[]");
-  } catch {
-    comparisons = [];
+    return (
+      <div style={{ minHeight: '100vh', background: '#f5f5f5', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ color: '#999' }}>未找到检验记录</div>
+      </div>
+    );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div style={{ minHeight: '100vh', background: '#f5f5f5' }}>
       {/* Header */}
-      <header className="bg-white shadow-sm border-b sticky top-0 z-10">
-        <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Button variant="ghost" size="sm" onClick={() => router.push("/dashboard")}>
-              ← 返回
-            </Button>
-            <h1 className="text-lg font-bold">检验详情 #{inspection.id}</h1>
+      <div className="header-bar" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <button onClick={() => router.back()} style={{ background: 'none', border: 'none', color: '#fff', fontSize: '20px', cursor: 'pointer', padding: '4px' }}>
+          ←
+        </button>
+        <div className="title" style={{ flex: 1 }}>检验详情</div>
+        <span className={`status-badge ${
+          inspection.status === 'approved' ? 'status-approved' :
+          inspection.status === 'rejected' ? 'status-rejected' : 'status-pending'
+        }`}>
+          {STATUS_LABELS[inspection.status] || inspection.status}
+        </span>
+      </div>
+
+      {/* Section 1: Basic Info */}
+      <div className="section">
+        <div className="section-title">📋 基本信息</div>
+        <div className="card">
+          <div className="info-grid">
+            <div className="info-item">
+              <div className="info-label">检验日期</div>
+              <div className="info-value">{inspection.inspection_date || inspection.created_at?.split('T')[0]}</div>
+            </div>
+            <div className="info-item">
+              <div className="info-label">产品名称</div>
+              <div className="info-value">{inspection.product_name}</div>
+            </div>
+            <div className="info-item">
+              <div className="info-label">产品代码</div>
+              <div className="info-value">{inspection.product_code}</div>
+            </div>
+            <div className="info-item">
+              <div className="info-label">色号</div>
+              <div className="info-value">{inspection.color_number}</div>
+            </div>
+            <div className="info-item">
+              <div className="info-label">批号</div>
+              <div className="info-value" style={{ color: '#999' }}>{inspection.batch_number} <span style={{ fontSize: '10px' }}>(不参与比对)</span></div>
+            </div>
+            <div className="info-item">
+              <div className="info-label">提交人</div>
+              <div className="info-value">{inspection.created_by_name}</div>
+            </div>
           </div>
-          {canApprove() && (
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={() => setShowRejectDialog(true)}>
-                驳回
-              </Button>
-              <Button className="bg-green-600 hover:bg-green-700" onClick={handleApprove} disabled={processing}>
-                {processing ? "处理中..." : "通过"}
-              </Button>
+
+          {inspection.instruction_order_image && (
+            <div style={{ marginTop: '12px' }}>
+              <div className="info-label" style={{ marginBottom: '6px' }}>工单/指令单照片</div>
+              <div className="photo-preview">
+                <img src={inspection.instruction_order_image} alt="工单" style={{ height: '120px' }} />
+              </div>
             </div>
           )}
         </div>
-      </header>
+      </div>
 
-      <main className="max-w-4xl mx-auto px-4 py-6 space-y-6">
-        {/* Status & Info */}
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle>产品信息</CardTitle>
-              <Badge className={STATUS_COLORS[inspection.status]}>
-                {STATUS_NAMES[inspection.status]}
-              </Badge>
+      {/* Section 2: Photo Comparison */}
+      <div className="section">
+        <div className="section-title"> 照片对比</div>
+        {inspection.comparisons.map((comp) => (
+          <div key={comp.side} className="card">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+              <span style={{ fontSize: '14px', fontWeight: '600' }}>{comp.side_name}</span>
+              <span className={`status-badge ${comp.result === 'pass' ? 'status-approved' : 'status-rejected'}`}>
+                {comp.result === 'pass' ? '✅ 通过' : '❌ 不通过'}
+              </span>
             </div>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div>
-                <p className="text-xs text-gray-500">产品名称</p>
-                <p className="font-medium">{inspection.product_name}</p>
-              </div>
-              <div>
-                <p className="text-xs text-gray-500">产品代码</p>
-                <p className="font-medium">{inspection.product_code}</p>
-              </div>
-              <div>
-                <p className="text-xs text-gray-500">色号</p>
-                <p className="font-medium">{inspection.color_number}</p>
-              </div>
-              <div>
-                <p className="text-xs text-gray-500">批号</p>
-                <p className="font-medium">{inspection.batch_number || "-"}</p>
-              </div>
-            </div>
-            <div className="mt-4 pt-4 border-t grid grid-cols-2 md:grid-cols-3 gap-4">
-              <div>
-                <p className="text-xs text-gray-500">辅助人员</p>
-                <p className="font-medium">{inspection.assistant_name}</p>
-              </div>
-              <div>
-                <p className="text-xs text-gray-500">创建时间</p>
-                <p className="font-medium">{new Date(inspection.created_at).toLocaleString("zh-CN")}</p>
-              </div>
-              <div>
-                <p className="text-xs text-gray-500">首件判定</p>
-                <Badge className={inspection.result === "pass" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}>
-                  {inspection.result === "pass" ? "通过" : "不通过"}
-                </Badge>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
 
-        {/* Photo Comparisons */}
-        <Card>
-          <CardHeader>
-            <CardTitle>照片对比</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            {comparisons.map((comp: any, index: number) => (
-              <div key={index} className="border rounded-lg p-4 space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="font-medium">{SIDE_NAMES[comp.side - 1]}对比</h3>
-                  <Badge className={comp.result === "pass" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}>
-                    {comp.result === "pass" ? "通过" : "不通过"}
-                  </Badge>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <p className="text-xs text-gray-500">标样照片</p>
-                    <div className="border rounded-lg overflow-hidden h-48">
-                      {comp.standard ? (
-                        <img src={comp.standard} alt="标样" className="w-full h-full object-cover" />
-                      ) : (
-                        <div className="w-full h-full bg-gray-100 flex items-center justify-center text-gray-400 text-sm">
-                          无照片
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-xs text-gray-500">首件实物照片</p>
-                    <div className="border rounded-lg overflow-hidden h-48">
-                      {comp.actual ? (
-                        <img src={comp.actual} alt="首件" className="w-full h-full object-cover" />
-                      ) : (
-                        <div className="w-full h-full bg-gray-100 flex items-center justify-center text-gray-400 text-sm">
-                          无照片
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {comp.result === "fail" && comp.difference && (
-                  <div className="p-3 bg-red-50 rounded-lg">
-                    <p className="text-xs text-red-600 font-medium mb-1">差异说明：</p>
-                    <p className="text-sm text-red-700">{comp.difference}</p>
+            <div className="comparison-row">
+              <div className="photo-side">
+                <div style={{ fontSize: '11px', color: '#999', marginBottom: '4px' }}>标样照片</div>
+                {comp.standard && (
+                  <div className="photo-preview">
+                    <img src={comp.standard} alt="标样" />
                   </div>
                 )}
               </div>
-            ))}
-          </CardContent>
-        </Card>
-
-        {/* Result Summary */}
-        <Card>
-          <CardHeader>
-            <CardTitle>核对结果</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className={`p-4 rounded-lg ${inspection.result === "pass" ? "bg-green-50 border border-green-200" : "bg-red-50 border border-red-200"}`}>
-              <div className="flex items-center gap-2 mb-2">
-                {inspection.result === "pass" ? (
-                  <>
-                    <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <span className="font-medium text-green-700">核对结果：通过</span>
-                  </>
-                ) : (
-                  <>
-                    <svg className="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <span className="font-medium text-red-700">核对结果：不通过</span>
-                  </>
+              <div className="photo-side">
+                <div style={{ fontSize: '11px', color: '#999', marginBottom: '4px' }}>首件照片</div>
+                {comp.actual && (
+                  <div className="photo-preview">
+                    <img src={comp.actual} alt="首件" />
+                  </div>
                 )}
               </div>
-              <p className="text-sm text-gray-700 whitespace-pre-line">{inspection.result_summary}</p>
             </div>
-          </CardContent>
-        </Card>
 
-        {/* Approval History */}
-        <Card>
-          <CardHeader>
-            <CardTitle>审核记录</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {/* Created */}
-              <div className="flex items-start gap-3">
-                <div className="w-2 h-2 rounded-full bg-blue-500 mt-2" />
-                <div>
-                  <p className="text-sm font-medium">辅助 {inspection.assistant_name} 提交检验</p>
-                  <p className="text-xs text-gray-500">{new Date(inspection.created_at).toLocaleString("zh-CN")}</p>
-                </div>
+            {comp.difference && (
+              <div style={{ marginTop: '8px', padding: '8px', background: '#ffebee', borderRadius: '6px', fontSize: '12px', color: '#d32f2f' }}>
+                <strong>差异说明：</strong>{comp.difference}
               </div>
+            )}
+          </div>
+        ))}
+      </div>
 
-              {/* Line Leader */}
-              {inspection.line_leader_id && (
-                <div className="flex items-start gap-3">
-                  <div className={`w-2 h-2 rounded-full mt-2 ${inspection.status === "line_leader_review" ? "bg-blue-500 animate-pulse" : inspection.line_leader_approved ? "bg-green-500" : "bg-red-500"}`} />
-                  <div>
-                    <p className="text-sm font-medium">
-                      线长 {inspection.line_leader_name}{" "}
-                      {inspection.line_leader_approved ? "审核通过" : "审核驳回"}
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      {inspection.line_leader_time && new Date(inspection.line_leader_time).toLocaleString("zh-CN")}
-                    </p>
-                    {inspection.line_leader_reject_reason && (
-                      <p className="text-xs text-red-600 mt-1">原因：{inspection.line_leader_reject_reason}</p>
-                    )}
-                  </div>
-                </div>
-              )}
+      {/* Section 3: Result */}
+      <div className="section">
+        <div className="section-title"> 检验结果</div>
+        <div className="card">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+            <span style={{ fontSize: '24px' }}>{inspection.result === 'pass' ? '✅' : '❌'}</span>
+            <span style={{ fontSize: '16px', fontWeight: '600', color: inspection.result === 'pass' ? '#2e7d32' : '#d32f2f' }}>
+              {inspection.result === 'pass' ? '检验通过' : '检验不通过'}
+            </span>
+          </div>
+          {inspection.result_summary && (
+            <div style={{ fontSize: '13px', color: '#666' }}>{inspection.result_summary}</div>
+          )}
+        </div>
+      </div>
 
-              {/* Supervisor */}
-              {inspection.supervisor_id && (
-                <div className="flex items-start gap-3">
-                  <div className={`w-2 h-2 rounded-full mt-2 ${inspection.status === "supervisor_review" ? "bg-blue-500 animate-pulse" : inspection.supervisor_approved ? "bg-green-500" : "bg-red-500"}`} />
-                  <div>
-                    <p className="text-sm font-medium">
-                      主管 {inspection.supervisor_name}{" "}
-                      {inspection.supervisor_approved ? "审核通过" : "审核驳回"}
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      {inspection.supervisor_time && new Date(inspection.supervisor_time).toLocaleString("zh-CN")}
-                    </p>
-                    {inspection.supervisor_reject_reason && (
-                      <p className="text-xs text-red-600 mt-1">原因：{inspection.supervisor_reject_reason}</p>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* QC */}
-              {inspection.qc_id && (
-                <div className="flex items-start gap-3">
-                  <div className={`w-2 h-2 rounded-full mt-2 ${inspection.status === "qc_review" ? "bg-blue-500 animate-pulse" : inspection.qc_approved ? "bg-green-500" : "bg-red-500"}`} />
-                  <div>
-                    <p className="text-sm font-medium">
-                      QC {inspection.qc_name}{" "}
-                      {inspection.qc_approved ? "审核通过" : "审核驳回"}
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      {inspection.qc_time && new Date(inspection.qc_time).toLocaleString("zh-CN")}
-                    </p>
-                    {inspection.qc_reject_reason && (
-                      <p className="text-xs text-red-600 mt-1">原因：{inspection.qc_reject_reason}</p>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Pending */}
-              {inspection.status.includes("review") && (
-                <div className="flex items-start gap-3">
-                  <div className="w-2 h-2 rounded-full bg-gray-300 mt-2" />
-                  <div>
-                    <p className="text-sm text-gray-500">等待审核中...</p>
-                  </div>
+      {/* Section 4: Review History */}
+      {inspection.reviewer_name && (
+        <div className="section">
+          <div className="section-title">📝 审核记录</div>
+          <div className="card">
+            <div className="info-grid">
+              <div className="info-item">
+                <div className="info-label">审核人</div>
+                <div className="info-value">{inspection.reviewer_name}</div>
+              </div>
+              {inspection.reviewed_at && (
+                <div className="info-item">
+                  <div className="info-label">审核时间</div>
+                  <div className="info-value">{inspection.reviewed_at?.replace('T', ' ').substring(0, 16)}</div>
                 </div>
               )}
             </div>
-          </CardContent>
-        </Card>
-      </main>
+            {inspection.review_comment && (
+              <div style={{ marginTop: '8px', padding: '8px', background: '#f5f5f5', borderRadius: '6px', fontSize: '12px', color: '#666' }}>
+                <strong>审核意见：</strong>{inspection.review_comment}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
-      {/* Reject Dialog */}
-      {showRejectDialog && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <Card className="w-full max-w-md mx-4">
-            <CardHeader>
-              <CardTitle>驳回检验</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label>驳回原因 *</Label>
-                <Textarea
-                  value={rejectReason}
-                  onChange={(e) => setRejectReason(e.target.value)}
-                  placeholder="请填写驳回原因，将通知辅助人员"
-                  rows={4}
-                />
-              </div>
-              <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={() => setShowRejectDialog(false)}>
-                  取消
-                </Button>
-                <Button variant="destructive" onClick={handleReject} disabled={processing}>
-                  {processing ? "处理中..." : "确认驳回"}
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+      {/* Action Buttons */}
+      {canReview() && (
+        <div style={{ padding: '12px 12px 24px 12px', display: 'flex', gap: '10px' }}>
+          <button className="btn-primary" onClick={handleApprove} disabled={actionLoading} style={{ flex: 1 }}>
+            {actionLoading ? '处理中...' : '✅ 审核通过'}
+          </button>
+          <button className="btn-danger" onClick={() => setShowRejectModal(true)} disabled={actionLoading} style={{ flex: 1 }}>
+            ❌ 驳回
+          </button>
+        </div>
+      )}
+
+      {/* Reject Modal */}
+      {showRejectModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' }}>
+          <div className="card" style={{ width: '100%', maxWidth: '360px' }}>
+            <div style={{ fontSize: '16px', fontWeight: '600', marginBottom: '12px' }}>驳回原因</div>
+            <textarea
+              className="input-box"
+              placeholder="请填写驳回原因"
+              value={rejectReason}
+              onChange={(e) => setRejectReason(e.target.value)}
+              rows={4}
+              style={{ resize: 'vertical', marginBottom: '12px' }}
+            />
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button className="btn-secondary" onClick={() => { setShowRejectModal(false); setRejectReason(''); }} style={{ flex: 1 }}>
+                取消
+              </button>
+              <button className="btn-danger" onClick={handleReject} disabled={actionLoading} style={{ flex: 1 }}>
+                {actionLoading ? '提交中...' : '确认驳回'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
