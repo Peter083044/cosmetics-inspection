@@ -596,7 +596,7 @@ export default function InspectionDetailPage({ params }: { params: Promise<{ id:
                 <div style={{ fontSize: '11px', color: '#999', marginBottom: '4px' }}>标样照片</div>
                 {comp.standard && (
                   <div className="photo-preview">
-                    <img src={comp.standard} alt="标样" />
+                    <img src={comp.standard} alt="标样" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; (e.target as HTMLImageElement).parentElement!.innerHTML = '<div style="width:100%;height:120px;background:#f5f5f5;display:flex;align-items:center;justify-content:center;color:#999;font-size:12px;border-radius:8px">图片不存在</div>'; }} />
                   </div>
                 )}
               </div>
@@ -604,7 +604,7 @@ export default function InspectionDetailPage({ params }: { params: Promise<{ id:
                 <div style={{ fontSize: '11px', color: '#999', marginBottom: '4px' }}>首件照片</div>
                 {comp.actual && (
                   <div className="photo-preview">
-                    <img src={comp.actual} alt="首件" />
+                    <img src={comp.actual} alt="首件" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; (e.target as HTMLImageElement).parentElement!.innerHTML = '<div style="width:100%;height:120px;background:#f5f5f5;display:flex;align-items:center;justify-content:center;color:#999;font-size:12px;border-radius:8px">图片不存在</div>'; }} />
                   </div>
                 )}
               </div>
