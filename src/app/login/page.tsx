@@ -127,6 +127,12 @@ export default function LoginPage() {
           </div>
         </div>
 
+        <div style={{ textAlign: 'center', marginTop: '16px' }}>
+          <a href="/download" style={{ color: 'rgba(255,255,255,0.8)', fontSize: '13px', textDecoration: 'underline' }}>
+            手机安装指南
+          </a>
+        </div>
+
         <div style={{ textAlign: 'center', marginTop: '20px', fontSize: '12px', color: 'rgba(255,255,255,0.5)' }}>
           化妆品生产质量管控平台 v1.0
         </div>
