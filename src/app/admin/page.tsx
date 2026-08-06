@@ -121,7 +121,7 @@ export default function AdminPage() {
   const handleDeleteUser = async (userId: number) => {
     if (!confirm('确定删除该用户？')) return;
     try {
-      const res = await fetch(`/api/users/${userId}`, { method: 'DELETE' });
+      const res = await fetch(`/api/users?id=${userId}`, { method: 'DELETE' });
       const data = await res.json();
       if (data.success) {
         alert('删除成功');
@@ -273,8 +273,8 @@ export default function AdminPage() {
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <span className="role-tag" style={{ background: ROLE_COLORS[u.role] }}>{ROLE_LABELS[u.role]}</span>
                     {u.role !== 'admin' && (
-                      <button onClick={() => handleDeleteUser(u.id)} style={{ background: 'none', border: 'none', color: '#d32f2f', cursor: 'pointer', fontSize: '16px' }}>
-                        
+                      <button onClick={() => handleDeleteUser(u.id)} style={{ background: 'none', border: '1px solid #d32f2f', color: '#d32f2f', cursor: 'pointer', fontSize: '12px', padding: '4px 8px', borderRadius: '4px' }}>
+                        删除
                       </button>
                     )}
                   </div>
