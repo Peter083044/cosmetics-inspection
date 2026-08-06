@@ -587,7 +587,7 @@ export default function InspectionDetailPage({ params }: { params: Promise<{ id:
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
               <span style={{ fontSize: '14px', fontWeight: '600' }}>{comp.side_name}</span>
               <span className={`status-badge ${comp.result === 'pass' ? 'status-approved' : 'status-rejected'}`}>
-                {comp.result === 'pass' ? '✅ 通过' : '❌ 不通过'}
+                {comp.result === 'pass' ? '✅ 内容一致' : '❌ 内容不一致'}
               </span>
             </div>
 
@@ -648,7 +648,7 @@ export default function InspectionDetailPage({ params }: { params: Promise<{ id:
                 </div>
                 {lc.result && (
                   <div style={{ marginTop: '8px', display: 'inline-block', padding: '2px 8px', borderRadius: '4px', fontSize: '12px', background: lc.result === 'pass' ? '#e8f5e9' : '#ffebee', color: lc.result === 'pass' ? '#2e7d32' : '#d32f2f' }}>
-                    {lc.name || `标签${idx + 1}`}：{lc.result === 'pass' ? '通过' : '不通过'}
+                    {lc.name || `标签${idx + 1}`}：{lc.result === 'pass' ? '内容一致' : '内容不一致'}
                   </div>
                 )}
                 {lc.difference && (

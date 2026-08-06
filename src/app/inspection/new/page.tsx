@@ -473,8 +473,8 @@ export default function NewInspectionPage() {
                 onChange={(e) => updateComparison(idx, 'result', e.target.value)}
                 style={{ padding: '4px 8px', borderRadius: '6px', border: '1px solid #e0e0e0', fontSize: '12px', background: comp.result === 'pass' ? '#e8f5e9' : '#ffebee', color: comp.result === 'pass' ? '#2e7d32' : '#d32f2f' }}
               >
-                <option value="pass">✅ 通过</option>
-                <option value="fail">❌ 不通过</option>
+                <option value="pass">✅ 内容一致</option>
+                <option value="fail">❌ 内容不一致</option>
               </select>
             </div>
 
@@ -518,10 +518,10 @@ export default function NewInspectionPage() {
 
             {comp.result === 'fail' && !comparingSides.has(idx) && (
               <div style={{ marginTop: '8px' }}>
-                <label style={{ display: 'block', fontSize: '11px', color: '#d32f2f', marginBottom: '4px' }}>差异说明 *</label>
+                <label style={{ display: 'block', fontSize: '11px', color: '#d32f2f', marginBottom: '4px' }}>不一致说明 *</label>
                 <textarea
                   className="input-box"
-                  placeholder="请说明不通过的原因（颜色差异、外观差异等）"
+                  placeholder="请说明内容不一致的具体原因（脏物、色差等可忽略，无需填写）"
                   value={comp.difference}
                   onChange={(e) => updateComparison(idx, 'difference', e.target.value)}
                   rows={2}
@@ -547,8 +547,8 @@ export default function NewInspectionPage() {
                 ))}
                 style={{ padding: '4px 8px', borderRadius: '6px', border: '1px solid #e0e0e0', fontSize: '12px', background: lc.result === 'pass' ? '#e8f5e9' : '#ffebee', color: lc.result === 'pass' ? '#2e7d32' : '#d32f2f' }}
               >
-                <option value="pass">✅ 通过</option>
-                <option value="fail">❌ 不通过</option>
+                <option value="pass">✅ 内容一致</option>
+                <option value="fail">❌ 内容不一致</option>
               </select>
             </div>
 
@@ -596,10 +596,10 @@ export default function NewInspectionPage() {
 
             {lc.result === 'fail' && !comparingLabels.has(idx) && (
               <div style={{ marginTop: '8px' }}>
-                <label style={{ display: 'block', fontSize: '11px', color: '#d32f2f', marginBottom: '4px' }}>{lc.name}差异说明 *</label>
+                <label style={{ display: 'block', fontSize: '11px', color: '#d32f2f', marginBottom: '4px' }}>{lc.name}不一致说明 *</label>
                 <textarea
                   className="input-box"
-                  placeholder={`请说明${lc.name}不通过的原因`}
+                  placeholder={`请说明${lc.name}内容不一致的具体原因`}
                   value={lc.difference}
                   onChange={(e) => setLabelComparisons(prev => prev.map((item, i) =>
                     i === idx ? { ...item, difference: e.target.value } : item
