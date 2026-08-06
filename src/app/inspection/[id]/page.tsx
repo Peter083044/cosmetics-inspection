@@ -159,13 +159,18 @@ export default function InspectionDetailPage({ params }: { params: Promise<{ id:
 
   // 获取下一级审核角色
   const getNextReviewRole = (): string | null => {
-    if (!inspection?.review_levels || !Array.isArray(inspection.review_levels)) return null;
-    const levels = inspection.review_levels as string[];
-    const currentStatus = inspection.status;
+    // 默认审核链路
+    const defaultLevels = ['line_leader', 'supervisor', 'qc'];
+    const levels = (inspection?.review_levels && Array.isArray(inspection.review_levels)) 
+      ? inspection.review_levels as string[] 
+      : defaultLevels;
+    const currentStatus = inspection?.status;
+    
+    if (!currentStatus) return null;
     
     if (currentStatus === 'draft' || currentStatus === 'rejected') {
       // 提交审核，找第一个审核级别
-      return levels[0] || null;
+      return levels[0] || 'line_leader';
     }
     
     const currentRoleMap: Record<string, string> = {
@@ -177,21 +182,22 @@ export default function InspectionDetailPage({ params }: { params: Promise<{ id:
     if (!currentRole) return null;
     
     const currentIndex = levels.indexOf(currentRole);
-    if (currentIndex === -1 || currentIndex >= levels.length - 1) return null;
+    if (currentIndex === -1) return null;
+    if (currentIndex >= levels.length - 1) return null;
     
     return levels[currentIndex + 1];
   };
 
   // 打开审核人选择
-  const openReviewerSelect = () => {
+  const openReviewerSelect = async () => {
     const nextRole = getNextReviewRole();
     if (!nextRole) {
       alert('无法确定下一级审核人');
       return;
     }
     setNextRoleLabel(ROLE_LABELS[nextRole] || nextRole);
-    fetchAvailableReviewers(nextRole);
     setShowReviewerSelect(true);
+    await fetchAvailableReviewers(nextRole);
   };
 
   // 确认选择审核人并提交
@@ -332,7 +338,7 @@ export default function InspectionDetailPage({ params }: { params: Promise<{ id:
     }
     // Check if reviewer needs to be selected
     if (!selectedReviewerId) {
-      setShowReviewerSelect(true);
+      await openReviewerSelect();
       return;
     }
     setActionLoading(true);
