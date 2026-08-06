@@ -1,0 +1,29 @@
+{
+  "appId": "com.cosmetics.inspection",
+  "appName": "首件核对",
+  "webDir": "out",
+  "server": {
+    "url": "https://9d1594b9-043d-4d06-9440-793881df6bcc.dev.coze.site",
+    "cleartext": false
+  },
+  "android": {
+    "allowMixedContent": false,
+    "captureInput": true,
+    "webContentsDebuggingEnabled": false
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 2000,
+      "backgroundColor": "#1e3a5f",
+      "showSpinner": false,
+      "androidScaleType": "CENTER_CROP"
+    },
+    "StatusBar": {
+      "style": "DARK",
+      "backgroundColor": "#1e3a5f"
+    },
+    "Camera": {
+      "presentationStyle": "FULLSCREEN"
+    }
+  }
+}
