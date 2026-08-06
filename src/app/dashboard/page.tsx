@@ -97,6 +97,56 @@ export default function DashboardPage() {
   const [showSwitchModal, setShowSwitchModal] = useState(false);
   const [recentAccounts, setRecentAccounts] = useState<Array<{username: string; name: string; role: string; password: string}>>([]);
 
+  // 批量删除功能
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [deleting, setDeleting] = useState(false);
+
+  const handleBatchDelete = async () => {
+    if (selectedIds.size === 0) return;
+    if (!confirm(`确定要删除选中的 ${selectedIds.size} 条记录吗？\n\n删除后无法恢复，关联照片也将被删除。`)) return;
+
+    setDeleting(true);
+    try {
+      const res = await fetch('/api/inspections', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: Array.from(selectedIds) }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert(data.message || `已删除 ${selectedIds.size} 条记录`);
+        setSelectedIds(new Set());
+        // 重新加载记录
+        const inspRes = await fetch('/api/inspections');
+        const inspData = await inspRes.json();
+        if (inspData.success) setInspections(inspData.data);
+      } else {
+        alert(data.error || '删除失败');
+      }
+    } catch {
+      alert('删除失败，请重试');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const toggleSelect = (id: number) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === filteredInspections.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filteredInspections.map(i => i.id)));
+    }
+  };
+
   useEffect(() => {
     // 从 localStorage 读取最近登录的账号
     try {
@@ -227,6 +277,31 @@ export default function DashboardPage() {
         )}
       </div>
 
+      {/* 管理员批量操作栏 */}
+      {user?.role === 'admin' && filteredInspections.length > 0 && (
+        <div style={{ padding: '12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#f8f9fa', borderRadius: '10px', marginBottom: '12px' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px' }}>
+            <input 
+              type="checkbox" 
+              checked={selectedIds.size === filteredInspections.length && filteredInspections.length > 0}
+              onChange={toggleSelectAll}
+              style={{ width: '16px', height: '16px' }}
+            />
+            全选 ({selectedIds.size}/{filteredInspections.length})
+          </label>
+          {selectedIds.size > 0 && (
+            <button 
+              className="btn-danger" 
+              onClick={handleBatchDelete}
+              disabled={deleting}
+              style={{ fontSize: '13px', padding: '6px 16px' }}
+            >
+              {deleting ? '删除中...' : `🗑️ 删除选中 (${selectedIds.size})`}
+            </button>
+          )}
+        </div>
+      )}
+
       {/* List */}
       <div className="section">
         {loading ? (
@@ -239,8 +314,18 @@ export default function DashboardPage() {
         ) : (
           filteredInspections.map((item) => {
             const statusInfo = getStatusInfo(item.status);
+            const isAdmin = user?.role === 'admin';
+            const isSelected = selectedIds.has(item.id);
             return (
-              <div key={item.id} className="card" onClick={() => router.push(`/inspection/${item.id}`)} style={{ cursor: 'pointer' }}>
+              <div key={item.id} className="card" onClick={() => router.push(`/inspection/${item.id}`)} style={{ cursor: 'pointer', position: 'relative', border: isSelected ? '2px solid #d32f2f' : undefined }}>
+                {isAdmin && (
+                  <div 
+                    onClick={(e) => { e.stopPropagation(); toggleSelect(item.id); }}
+                    style={{ position: 'absolute', top: '10px', right: '10px', zIndex: 1 }}
+                  >
+                    <input type="checkbox" checked={isSelected} readOnly style={{ width: '18px', height: '18px', cursor: 'pointer' }} />
+                  </div>
+                )}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
                   <div>
                     <div style={{ fontSize: '15px', fontWeight: '600', color: '#212121' }}>{item.product_name}</div>

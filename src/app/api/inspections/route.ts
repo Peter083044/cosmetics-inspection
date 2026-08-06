@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getCurrentUser, REVIEW_FLOW } from '@/lib/auth';
 import db, { initDatabase } from '@/lib/db';
+import fs from 'fs';
+import path from 'path';
 
 initDatabase();
 
@@ -191,6 +193,84 @@ export async function POST(request: NextRequest) {
     console.error('Create inspection error:', error);
     return NextResponse.json(
       { error: '创建检验记录失败' },
+      { status: 500 }
+    );
+  }
+}
+
+// DELETE /api/inspections - 管理员删除检验记录（单条或批量）
+export async function DELETE(request: NextRequest) {
+  try {
+    const user = await getCurrentUser();
+    if (!user) {
+      return NextResponse.json({ error: '未登录' }, { status: 401 });
+    }
+
+    if (user.role !== 'admin') {
+      return NextResponse.json({ error: '仅管理员可删除记录' }, { status: 403 });
+    }
+
+    const body = await request.json();
+    const { ids } = body as { ids: number[] };
+
+    if (!ids || !Array.isArray(ids) || ids.length === 0) {
+      return NextResponse.json({ error: '请提供要删除的记录ID' }, { status: 400 });
+    }
+
+    const placeholders = ids.map(() => '?').join(',');
+
+    // 获取要删除记录的照片路径
+    const photos = db.prepare(`
+      SELECT comparisons, label_comparisons FROM inspections WHERE id IN (${placeholders})
+    `).all(...ids) as any[];
+
+    const photoPaths = new Set<string>();
+    for (const record of photos) {
+      try {
+        const comparisons = JSON.parse(record.comparisons || '[]');
+        for (const c of comparisons) {
+          if (c.standard && c.standard.startsWith('/uploads/')) photoPaths.add(c.standard);
+          if (c.actual && c.actual.startsWith('/uploads/')) photoPaths.add(c.actual);
+        }
+        const labelComparisons = JSON.parse(record.label_comparisons || '[]');
+        for (const c of labelComparisons) {
+          if (c.standard && c.standard.startsWith('/uploads/')) photoPaths.add(c.standard);
+          if (c.actual && c.actual.startsWith('/uploads/')) photoPaths.add(c.actual);
+        }
+      } catch { /* ignore */ }
+    }
+
+    // 删除审核日志
+    db.prepare(`DELETE FROM approvals WHERE inspection_id IN (${placeholders})`).run(...ids);
+
+    // 删除检验记录
+    const result = db.prepare(`DELETE FROM inspections WHERE id IN (${placeholders})`).run(...ids);
+
+    // 删除照片文件（仅当没有其他记录引用时）
+    let deletedPhotos = 0;
+    for (const photoPath of photoPaths) {
+      const fullPath = path.join(process.cwd(), 'public', photoPath);
+      // 检查是否还有其他记录引用此照片
+      const likePath = `%${photoPath}%`;
+      const refCount = db.prepare(`
+        SELECT COUNT(*) as cnt FROM inspections 
+        WHERE comparisons LIKE ? OR label_comparisons LIKE ?
+      `).get(likePath, likePath) as any;
+
+      if (refCount.cnt === 0 && fs.existsSync(fullPath)) {
+        fs.unlinkSync(fullPath);
+        deletedPhotos++;
+      }
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: `已删除 ${result.changes} 条记录，${deletedPhotos} 张照片`,
+    });
+  } catch (error) {
+    console.error('Delete inspection error:', error);
+    return NextResponse.json(
+      { error: '删除检验记录失败' },
       { status: 500 }
     );
   }

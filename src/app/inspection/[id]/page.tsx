@@ -386,6 +386,32 @@ export default function InspectionDetailPage({ params }: { params: Promise<{ id:
   };
 
   // 判断当前用户是否可以提交（辅助人员，且状态为draft或rejected）
+  // 管理员删除记录
+  const handleDelete = async () => {
+    if (!inspection) return;
+    if (!confirm(`确定要删除此检验记录吗？\n\n产品：${inspection.product_name}\n批号：${inspection.batch_number}\n\n删除后无法恢复，关联照片也将被删除。`)) return;
+
+    setActionLoading(true);
+    try {
+      const res = await fetch(`/api/inspections`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: [inspection.id] }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert('记录已删除');
+        router.push('/dashboard');
+      } else {
+        alert(data.error || '删除失败');
+      }
+    } catch {
+      alert('删除失败，请重试');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   const canSubmit = (): boolean => {
     if (!user || !inspection) return false;
     if (user.role !== 'assistant' && user.role !== 'admin') return false;
@@ -683,6 +709,20 @@ export default function InspectionDetailPage({ params }: { params: Promise<{ id:
             openReviewerSelect();
           }} disabled={actionLoading} style={{ width: '100%' }}>
             {actionLoading ? '提交中...' : '📤 提交审核'}
+          </button>
+        </div>
+      )}
+
+      {/* 管理员删除按钮 */}
+      {user?.role === 'admin' && inspection && (
+        <div style={{ padding: '0 12px 24px 12px' }}>
+          <button 
+            className="btn-danger" 
+            onClick={handleDelete} 
+            disabled={actionLoading} 
+            style={{ width: '100%', fontSize: '13px', opacity: 0.8 }}
+          >
+            🗑️ 删除此记录
           </button>
         </div>
       )}
