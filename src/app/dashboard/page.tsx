@@ -12,11 +12,10 @@ interface Inspection {
   batch_number: string;
   status: string;
   result: string;
-  created_by_name: string;
+  assistant_name: string;
+  submit_explanation: string;
+  rejected_to: string;
   created_at: string;
-  reviewer_name?: string;
-  review_comment?: string;
-  reviewed_at?: string;
 }
 
 interface User {
@@ -27,6 +26,7 @@ interface User {
 }
 
 const STATUS_MAP: Record<string, { label: string; cls: string }> = {
+  draft: { label: '草稿', cls: 'status-draft' },
   line_leader_review: { label: '待线长审核', cls: 'status-pending' },
   supervisor_review: { label: '待主管审核', cls: 'status-pending' },
   qc_review: { label: '待QC审核', cls: 'status-pending' },
@@ -130,9 +130,14 @@ export default function DashboardPage() {
           + 新建检验
         </button>
         {user?.role === 'admin' && (
-          <button className="btn-secondary" style={{ width: 'auto', padding: '12px 16px' }} onClick={() => router.push('/admin')}>
-            ️ 管理
-          </button>
+          <>
+            <button className="btn-secondary" style={{ width: 'auto', padding: '12px 16px' }} onClick={() => router.push('/admin')}>
+              管理
+            </button>
+            <button className="btn-secondary" style={{ width: 'auto', padding: '12px 16px' }} onClick={() => router.push('/admin?tab=export')}>
+              导出
+            </button>
+          </>
         )}
       </div>
 
@@ -163,13 +168,23 @@ export default function DashboardPage() {
                   <span className="product-tag tag-gray">{item.batch_number}</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px', color: '#999' }}>
-                  <span>提交人: {item.created_by_name}</span>
+                  <span>提交人: {item.assistant_name}</span>
                   {item.result && (
                     <span style={{ color: item.result === 'pass' ? '#2e7d32' : '#d32f2f', fontWeight: '500' }}>
                       {item.result === 'pass' ? '✅ 通过' : '❌ 不通过'}
                     </span>
                   )}
                 </div>
+                {item.rejected_to && item.status !== 'rejected' && (
+                  <div style={{ marginTop: '6px', fontSize: '11px', color: '#e65100', background: '#fff3e0', padding: '4px 8px', borderRadius: '4px' }}>
+                    ↩️ 已退回给{ROLE_LABELS[item.rejected_to] || item.rejected_to}
+                  </div>
+                )}
+                {item.submit_explanation && (
+                  <div style={{ marginTop: '6px', fontSize: '11px', color: '#666', background: '#f5f5f5', padding: '4px 8px', borderRadius: '4px' }}>
+                    📝 {item.submit_explanation.substring(0, 50)}{item.submit_explanation.length > 50 ? '...' : ''}
+                  </div>
+                )}
               </div>
             );
           })

@@ -73,10 +73,24 @@ export function initDatabase() {
       qc_approved BOOLEAN,
       qc_time DATETIME,
       qc_reject_reason TEXT,
+      submit_explanation TEXT,
+      rejected_to TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )
   `);
+
+  // 尝试添加新字段（兼容旧数据库）
+  try {
+    db.exec(`ALTER TABLE inspections ADD COLUMN submit_explanation TEXT`);
+  } catch {
+    // 字段已存在，忽略
+  }
+  try {
+    db.exec(`ALTER TABLE inspections ADD COLUMN rejected_to TEXT`);
+  } catch {
+    // 字段已存在，忽略
+  }
 
   // 审核记录表
   db.exec(`
@@ -85,8 +99,9 @@ export function initDatabase() {
       inspection_id INTEGER NOT NULL REFERENCES inspections(id) ON DELETE CASCADE,
       reviewer_id INTEGER NOT NULL REFERENCES users(id),
       reviewer_role TEXT NOT NULL,
-      action TEXT NOT NULL CHECK(action IN ('approved', 'rejected')),
+      action TEXT NOT NULL CHECK(action IN ('approved', 'rejected', 'returned')),
       comments TEXT,
+      submit_reason TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )
   `);

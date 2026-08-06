@@ -10,6 +10,7 @@ interface Inspection {
   product_code: string;
   color_number: string;
   batch_number: string;
+  work_order_image?: string;
   instruction_order_image?: string;
   comparisons: Array<{
     side: number;
@@ -21,12 +22,11 @@ interface Inspection {
   }>;
   result: string;
   result_summary: string;
+  submit_explanation: string;
+  rejected_to: string;
   status: string;
-  created_by_name: string;
+  assistant_name: string;
   created_at: string;
-  reviewer_name?: string;
-  review_comment?: string;
-  reviewed_at?: string;
 }
 
 interface User {
@@ -37,6 +37,7 @@ interface User {
 }
 
 const STATUS_LABELS: Record<string, string> = {
+  draft: '草稿',
   line_leader_review: '待线长审核',
   supervisor_review: '待主管审核',
   qc_review: '待QC审核',
@@ -60,6 +61,9 @@ export default function InspectionDetailPage({ params }: { params: Promise<{ id:
   const [actionLoading, setActionLoading] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
   const [showRejectModal, setShowRejectModal] = useState(false);
+  const [rejectType, setRejectType] = useState<'rejected' | 'returned'>('returned');
+  const [submitReason, setSubmitReason] = useState('');
+  const [showSubmitModal, setShowSubmitModal] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -108,9 +112,14 @@ export default function InspectionDetailPage({ params }: { params: Promise<{ id:
     }
   };
 
-  const handleReject = async () => {
-    if (!inspection || !rejectReason) {
-      alert('请填写驳回原因');
+  const openRejectModal = (type: 'rejected' | 'returned') => {
+    setRejectType(type);
+    setShowRejectModal(true);
+  };
+
+  const handleRejectOrReturn = async () => {
+    if (!inspection || !rejectReason.trim()) {
+      alert('请填写原因');
       return;
     }
     setActionLoading(true);
@@ -118,11 +127,11 @@ export default function InspectionDetailPage({ params }: { params: Promise<{ id:
       const res = await fetch(`/api/inspections/${inspection.id}/approve`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'rejected', comment: rejectReason }),
+        body: JSON.stringify({ action: rejectType, comment: rejectReason }),
       });
       const data = await res.json();
       if (data.success) {
-        alert('已驳回');
+        alert(rejectType === 'returned' ? '已退回给上一责任人' : '已驳回');
         setShowRejectModal(false);
         setRejectReason('');
         loadData();
@@ -136,15 +145,71 @@ export default function InspectionDetailPage({ params }: { params: Promise<{ id:
     }
   };
 
-  const canReview = () => {
+  // 计算通过率
+  const getPassRate = (): number => {
+    if (!inspection?.comparisons || inspection.comparisons.length === 0) return 100;
+    const activeComps = inspection.comparisons.filter(c => c.standard || c.actual);
+    if (activeComps.length === 0) return 100;
+    const passCount = activeComps.filter(c => c.result === 'pass').length;
+    return Math.round((passCount / activeComps.length) * 100);
+  };
+
+  // 提交审核（需要检查通过率）
+  const handleSubmitForReview = async () => {
+    if (!inspection) return;
+    const passRate = getPassRate();
+    if (passRate < 100 && !submitReason.trim()) {
+      setShowSubmitModal(true);
+      return;
+    }
+    setActionLoading(true);
+    try {
+      const res = await fetch(`/api/inspections/${inspection.id}/approve`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'submitted', submitReason: submitReason || undefined }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert('已提交审核');
+        setShowSubmitModal(false);
+        setSubmitReason('');
+        loadData();
+      } else {
+        alert(data.error || '操作失败');
+      }
+    } catch {
+      alert('网络错误');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // 判断当前用户是否可以审核此记录
+  const canReview = (): boolean => {
     if (!user || !inspection) return false;
-    if (inspection.status === 'approved' || inspection.status === 'rejected') return false;
+    if (inspection.status === 'approved') return false;
+    // 管理员可以审核任何阶段
+    if (user.role === 'admin') return true;
+    // 对应角色的审核阶段
     if (user.role === 'line_leader' && inspection.status === 'line_leader_review') return true;
     if (user.role === 'supervisor' && inspection.status === 'supervisor_review') return true;
     if (user.role === 'qc' && inspection.status === 'qc_review') return true;
-    if (user.role === 'admin') return true;
     return false;
   };
+
+  // 判断当前用户是否可以提交（辅助人员，且状态为draft或rejected）
+  const canSubmit = (): boolean => {
+    if (!user || !inspection) return false;
+    if (user.role !== 'assistant' && user.role !== 'admin') return false;
+    if (inspection.status === 'draft' || inspection.status === 'rejected') return true;
+    // 被退回到辅助的情况
+    if (inspection.rejected_to === 'assistant') return true;
+    return false;
+  };
+
+  const passRate = getPassRate();
+  const workOrderImage = inspection?.work_order_image || inspection?.instruction_order_image;
 
   if (loading) {
     return (
@@ -178,6 +243,33 @@ export default function InspectionDetailPage({ params }: { params: Promise<{ id:
         </span>
       </div>
 
+      {/* 退回/驳回提示 */}
+      {inspection.status === 'rejected' && (
+        <div className="section">
+          <div style={{ padding: '12px', background: '#ffebee', borderRadius: '8px', border: '1px solid #ef9a9a' }}>
+            <div style={{ fontSize: '14px', fontWeight: '600', color: '#c62828', marginBottom: '4px' }}>
+              ❌ 检验已被驳回
+            </div>
+            <div style={{ fontSize: '12px', color: '#b71c1c' }}>
+              辅助人员需要修改后重新提交
+            </div>
+          </div>
+        </div>
+      )}
+
+      {inspection.rejected_to && inspection.status !== 'rejected' && (
+        <div className="section">
+          <div style={{ padding: '12px', background: '#fff3e0', borderRadius: '8px', border: '1px solid #ffcc80' }}>
+            <div style={{ fontSize: '14px', fontWeight: '600', color: '#e65100', marginBottom: '4px' }}>
+              ↩️ 已退回给{ROLE_LABELS[inspection.rejected_to] || inspection.rejected_to}
+            </div>
+            <div style={{ fontSize: '12px', color: '#bf360c' }}>
+              需要重新编辑后提交
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Section 1: Basic Info */}
       <div className="section">
         <div className="section-title">📋 基本信息</div>
@@ -205,15 +297,15 @@ export default function InspectionDetailPage({ params }: { params: Promise<{ id:
             </div>
             <div className="info-item">
               <div className="info-label">提交人</div>
-              <div className="info-value">{inspection.created_by_name}</div>
+              <div className="info-value">{inspection.assistant_name}</div>
             </div>
           </div>
 
-          {inspection.instruction_order_image && (
+          {workOrderImage && (
             <div style={{ marginTop: '12px' }}>
               <div className="info-label" style={{ marginBottom: '6px' }}>工单/指令单照片</div>
               <div className="photo-preview">
-                <img src={inspection.instruction_order_image} alt="工单" style={{ height: '120px' }} />
+                <img src={workOrderImage} alt="工单" style={{ height: '120px' }} />
               </div>
             </div>
           )}
@@ -222,7 +314,7 @@ export default function InspectionDetailPage({ params }: { params: Promise<{ id:
 
       {/* Section 2: Photo Comparison */}
       <div className="section">
-        <div className="section-title"> 照片对比</div>
+        <div className="section-title">📷 照片对比</div>
         {inspection.comparisons.map((comp) => (
           <div key={comp.side} className="card">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
@@ -262,45 +354,29 @@ export default function InspectionDetailPage({ params }: { params: Promise<{ id:
 
       {/* Section 3: Result */}
       <div className="section">
-        <div className="section-title"> 检验结果</div>
+        <div className="section-title">📊 检验结果</div>
         <div className="card">
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
             <span style={{ fontSize: '24px' }}>{inspection.result === 'pass' ? '✅' : '❌'}</span>
             <span style={{ fontSize: '16px', fontWeight: '600', color: inspection.result === 'pass' ? '#2e7d32' : '#d32f2f' }}>
               {inspection.result === 'pass' ? '检验通过' : '检验不通过'}
             </span>
+            <span style={{ marginLeft: 'auto', fontSize: '14px', color: '#666' }}>
+              通过率：{passRate}%
+            </span>
           </div>
           {inspection.result_summary && (
-            <div style={{ fontSize: '13px', color: '#666' }}>{inspection.result_summary}</div>
+            <div style={{ fontSize: '13px', color: '#666', marginTop: '8px' }}>
+              <strong>总结：</strong>{inspection.result_summary}
+            </div>
+          )}
+          {inspection.submit_explanation && (
+            <div style={{ fontSize: '13px', color: '#e65100', marginTop: '8px', padding: '8px', background: '#fff3e0', borderRadius: '6px' }}>
+              <strong>提交说明：</strong>{inspection.submit_explanation}
+            </div>
           )}
         </div>
       </div>
-
-      {/* Section 4: Review History */}
-      {inspection.reviewer_name && (
-        <div className="section">
-          <div className="section-title">📝 审核记录</div>
-          <div className="card">
-            <div className="info-grid">
-              <div className="info-item">
-                <div className="info-label">审核人</div>
-                <div className="info-value">{inspection.reviewer_name}</div>
-              </div>
-              {inspection.reviewed_at && (
-                <div className="info-item">
-                  <div className="info-label">审核时间</div>
-                  <div className="info-value">{inspection.reviewed_at?.replace('T', ' ').substring(0, 16)}</div>
-                </div>
-              )}
-            </div>
-            {inspection.review_comment && (
-              <div style={{ marginTop: '8px', padding: '8px', background: '#f5f5f5', borderRadius: '6px', fontSize: '12px', color: '#666' }}>
-                <strong>审核意见：</strong>{inspection.review_comment}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
 
       {/* Action Buttons */}
       {canReview() && (
@@ -308,20 +384,39 @@ export default function InspectionDetailPage({ params }: { params: Promise<{ id:
           <button className="btn-primary" onClick={handleApprove} disabled={actionLoading} style={{ flex: 1 }}>
             {actionLoading ? '处理中...' : '✅ 审核通过'}
           </button>
-          <button className="btn-danger" onClick={() => setShowRejectModal(true)} disabled={actionLoading} style={{ flex: 1 }}>
+          <button className="btn-secondary" onClick={() => openRejectModal('returned')} disabled={actionLoading} style={{ flex: 1 }}>
+            ↩️ 退回
+          </button>
+          <button className="btn-danger" onClick={() => openRejectModal('rejected')} disabled={actionLoading} style={{ flex: 1 }}>
             ❌ 驳回
           </button>
         </div>
       )}
 
-      {/* Reject Modal */}
+      {/* 辅助人员提交按钮 */}
+      {canSubmit() && (
+        <div style={{ padding: '12px 12px 24px 12px' }}>
+          <button className="btn-primary" onClick={handleSubmitForReview} disabled={actionLoading} style={{ width: '100%' }}>
+            {actionLoading ? '提交中...' : '📤 提交审核 → 线长审核'}
+          </button>
+        </div>
+      )}
+
+      {/* Reject/Return Modal */}
       {showRejectModal && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' }}>
           <div className="card" style={{ width: '100%', maxWidth: '360px' }}>
-            <div style={{ fontSize: '16px', fontWeight: '600', marginBottom: '12px' }}>驳回原因</div>
+            <div style={{ fontSize: '16px', fontWeight: '600', marginBottom: '12px' }}>
+              {rejectType === 'returned' ? '↩️ 退回原因' : '❌ 驳回原因'}
+            </div>
+            <div style={{ fontSize: '12px', color: '#666', marginBottom: '8px' }}>
+              {rejectType === 'returned'
+                ? '退回后，上一责任人需要重新编辑并提交'
+                : '驳回后，记录将变为已驳回状态'}
+            </div>
             <textarea
               className="input-box"
-              placeholder="请填写驳回原因"
+              placeholder={rejectType === 'returned' ? '请填写退回原因' : '请填写驳回原因'}
               value={rejectReason}
               onChange={(e) => setRejectReason(e.target.value)}
               rows={4}
@@ -331,8 +426,41 @@ export default function InspectionDetailPage({ params }: { params: Promise<{ id:
               <button className="btn-secondary" onClick={() => { setShowRejectModal(false); setRejectReason(''); }} style={{ flex: 1 }}>
                 取消
               </button>
-              <button className="btn-danger" onClick={handleReject} disabled={actionLoading} style={{ flex: 1 }}>
-                {actionLoading ? '提交中...' : '确认驳回'}
+              <button
+                className={rejectType === 'returned' ? 'btn-secondary' : 'btn-danger'}
+                onClick={handleRejectOrReturn}
+                disabled={actionLoading || !rejectReason.trim()}
+                style={{ flex: 1, background: rejectType === 'returned' ? '#ff9800' : undefined, color: rejectType === 'returned' ? '#fff' : undefined }}
+              >
+                {actionLoading ? '提交中...' : (rejectType === 'returned' ? '确认退回' : '确认驳回')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Submit Reason Modal (通过率不足100%时) */}
+      {showSubmitModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' }}>
+          <div className="card" style={{ width: '100%', maxWidth: '360px' }}>
+            <div style={{ fontSize: '16px', fontWeight: '600', marginBottom: '8px' }}>⚠️ 通过率不足100%</div>
+            <div style={{ fontSize: '13px', color: '#666', marginBottom: '12px' }}>
+              当前通过率：{passRate}%，请填写提交说明原因
+            </div>
+            <textarea
+              className="input-box"
+              placeholder="请填写提交说明原因（必填）"
+              value={submitReason}
+              onChange={(e) => setSubmitReason(e.target.value)}
+              rows={4}
+              style={{ resize: 'vertical', marginBottom: '12px' }}
+            />
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button className="btn-secondary" onClick={() => { setShowSubmitModal(false); setSubmitReason(''); }} style={{ flex: 1 }}>
+                取消
+              </button>
+              <button className="btn-primary" onClick={handleSubmitForReview} disabled={actionLoading || !submitReason.trim()} style={{ flex: 1 }}>
+                {actionLoading ? '提交中...' : '确认提交'}
               </button>
             </div>
           </div>

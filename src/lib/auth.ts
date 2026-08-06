@@ -114,6 +114,8 @@ export async function getCurrentUser(): Promise<User | null> {
 
 // 权限检查
 export function hasPermission(userRole: UserRole, requiredRoles: UserRole[]): boolean {
+  // 管理员拥有所有权限
+  if (userRole === 'admin') return true;
   return requiredRoles.includes(userRole);
 }
 
@@ -124,6 +126,28 @@ export const REVIEW_FLOW = {
   supervisor: { next: 'qc', status: 'qc_review' },
   qc: { next: null, status: 'approved' },
 } as const;
+
+// 退回流程定义 - 退回后返回上一级的草稿状态
+export const REJECT_FLOW = {
+  line_leader: { back_to: 'assistant', status: 'draft' },
+  supervisor: { back_to: 'line_leader', status: 'line_leader_review' },
+  qc: { back_to: 'supervisor', status: 'supervisor_review' },
+} as const;
+
+// 获取可执行操作的角色列表
+export function getExecutableRoles(): UserRole[] {
+  return ['assistant', 'line_leader', 'supervisor', 'qc'];
+}
+
+// 检查用户是否有管理权限
+export function isAdmin(userRole: UserRole): boolean {
+  return userRole === 'admin';
+}
+
+// 检查用户是否有执行权限（非管理员的操作角色）
+export function isExecutor(userRole: UserRole): boolean {
+  return ['assistant', 'line_leader', 'supervisor', 'qc'].includes(userRole);
+}
 
 // 获取角色显示名称
 export function getRoleDisplayName(role: UserRole): string {

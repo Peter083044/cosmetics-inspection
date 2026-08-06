@@ -22,6 +22,9 @@ export async function GET(request: NextRequest) {
         i.id,
         i.status,
         i.result,
+        i.result_summary,
+        i.submit_explanation,
+        i.rejected_to,
         i.created_at,
         i.updated_at,
         i.inspection_date,
@@ -96,6 +99,8 @@ function generateCSV(data: any[]): string {
     '辅助人员',
     '检验结果',
     '状态',
+    '提交说明',
+    '退回至',
     '创建时间',
     '更新时间',
     '审核历史',
@@ -104,6 +109,7 @@ function generateCSV(data: any[]): string {
 
   const rows = data.map((item) => {
     const statusMap: Record<string, string> = {
+      draft: '草稿',
       pending: '待提交',
       line_leader_review: '线长审核中',
       supervisor_review: '主管审核中',
@@ -115,6 +121,13 @@ function generateCSV(data: any[]): string {
     const resultMap: Record<string, string> = {
       pass: '通过',
       fail: '不通过',
+    };
+
+    const roleMap: Record<string, string> = {
+      assistant: '辅助',
+      line_leader: '线长',
+      supervisor: '主管',
+      qc: 'QC',
     };
 
     const approvals = item.approvals
@@ -136,6 +149,8 @@ function generateCSV(data: any[]): string {
       item.assistant_name,
       resultMap[item.result] || item.result || '',
       statusMap[item.status] || item.status,
+      item.submit_explanation || '',
+      item.rejected_to ? (roleMap[item.rejected_to] || item.rejected_to) : '',
       item.created_at,
       item.updated_at,
       approvals,

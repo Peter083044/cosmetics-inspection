@@ -25,10 +25,19 @@ export async function GET(request: NextRequest) {
         FROM inspections i
         JOIN users u ON i.assistant_id = u.id
         WHERE i.id = ?
-      `).get(id);
+      `).get(id) as any;
 
       if (!inspection) {
         return NextResponse.json({ error: '检验记录不存在' }, { status: 404 });
+      }
+
+      // 解析 comparisons JSON
+      if (inspection.comparisons && typeof inspection.comparisons === 'string') {
+        try {
+          inspection.comparisons = JSON.parse(inspection.comparisons);
+        } catch {
+          inspection.comparisons = [];
+        }
       }
 
       return NextResponse.json({
@@ -98,7 +107,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { inspection_date, product_name, product_code, color_number, batch_number, work_order_image, comparisons, result, result_summary } = await request.json();
+    const { inspection_date, product_name, product_code, color_number, batch_number, work_order_image, instruction_order_image, comparisons, result, result_summary, submit_explanation } = await request.json();
 
     if (!product_name || !product_code) {
       return NextResponse.json(
@@ -107,10 +116,22 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // 通过率不足100%时，必须填写提交说明
+    const activeComparisons = comparisons ? comparisons.filter((c: any) => c.standard || c.actual) : [];
+    const hasFail = activeComparisons.some((c: any) => c.result === 'fail');
+    if (hasFail && !submit_explanation?.trim() && !result_summary?.trim()) {
+      return NextResponse.json(
+        { error: '通过率不足100%，必须填写提交说明原因' },
+        { status: 400 }
+      );
+    }
+
+    const imageToSave = work_order_image || instruction_order_image || null;
+
     // 创建检验记录
     const insertInspection = db.prepare(`
-      INSERT INTO inspections (inspection_date, product_name, product_code, color_number, batch_number, work_order_image, comparisons, result, result_summary, assistant_id, assistant_name, status)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO inspections (inspection_date, product_name, product_code, color_number, batch_number, work_order_image, comparisons, result, result_summary, submit_explanation, assistant_id, assistant_name, status)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     const inspectionResult = insertInspection.run(
@@ -119,10 +140,11 @@ export async function POST(request: NextRequest) {
       product_code,
       color_number || null,
       batch_number || null,
-      work_order_image || null,
+      imageToSave,
       comparisons ? JSON.stringify(comparisons) : null,
       result || null,
       result_summary || null,
+      submit_explanation || result_summary || null,
       user.id,
       user.name || user.username,
       'line_leader_review'

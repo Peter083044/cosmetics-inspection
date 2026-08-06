@@ -135,6 +135,14 @@ export default function NewInspectionPage() {
     }
 
     const hasFail = activeComparisons.some(c => c.result === 'fail');
+    const passRate = ((activeComparisons.filter(c => c.result === 'pass').length / activeComparisons.length) * 100).toFixed(0);
+
+    // 通过率不足100%时，必须填写提交说明
+    if (hasFail && !resultSummary.trim()) {
+      alert(`当前通过率${passRate}%，不足100%。请填写提交说明原因`);
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -151,6 +159,7 @@ export default function NewInspectionPage() {
           comparisons: activeComparisons,
           result: hasFail ? 'fail' : 'pass',
           result_summary: resultSummary || (hasFail ? '存在不通过项' : '全部通过'),
+          submit_explanation: hasFail ? resultSummary : undefined,
         }),
       });
 
@@ -287,17 +296,45 @@ export default function NewInspectionPage() {
         ))}
       </div>
 
-      {/* Section 3: Summary */}
+      {/* Section 3: Summary & Pass Rate Warning */}
       <div className="section">
-        <div className="section-title"> 检验总结</div>
+        <div className="section-title">📝 检验总结</div>
         <div className="card">
+          {(() => {
+            const activeComps = comparisons.filter(c => c.standard || c.actual);
+            const failCount = activeComps.filter(c => c.result === 'fail').length;
+            const passCount = activeComps.filter(c => c.result === 'pass').length;
+            const passRate = activeComps.length > 0 ? ((passCount / activeComps.length) * 100).toFixed(0) : '100';
+            if (activeComps.length > 0 && failCount > 0) {
+              return (
+                <div style={{ marginBottom: '12px', padding: '10px', background: '#fff3e0', borderRadius: '8px', border: '1px solid #ffcc80' }}>
+                  <div style={{ fontSize: '13px', color: '#e65100', fontWeight: '600' }}>
+                    ⚠️ 通过率 {passRate}%（{passCount}/{activeComps.length}），不足100%
+                  </div>
+                  <div style={{ fontSize: '12px', color: '#bf360c', marginTop: '4px' }}>
+                    必须填写提交说明原因，否则无法提交
+                  </div>
+                </div>
+              );
+            }
+            return null;
+          })()}
           <textarea
             className="input-box"
-            placeholder="检验总结说明（可选）"
+            placeholder={
+              comparisons.filter(c => c.standard || c.actual).some(c => c.result === 'fail')
+                ? '通过率不足100%，请填写提交说明原因 *'
+                : '检验总结说明（可选）'
+            }
             value={resultSummary}
             onChange={(e) => setResultSummary(e.target.value)}
             rows={3}
-            style={{ resize: 'vertical' }}
+            style={{
+              resize: 'vertical',
+              border: comparisons.filter(c => c.standard || c.actual).some(c => c.result === 'fail') && !resultSummary.trim()
+                ? '2px solid #ff9800'
+                : undefined,
+            }}
           />
         </div>
       </div>

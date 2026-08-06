@@ -45,9 +45,13 @@ src/
 - 支持 Bearer token 认证（Authorization header）
 - bcrypt 密码哈希
 - 角色：assistant（辅助）、line_leader（线长）、supervisor（主管）、qc（QC）、admin（管理员）
+- 权限区分：管理员拥有所有权限（审核、管理、导出），其他角色仅有执行权限
+- 权限函数：`hasPermission()`, `isAdmin()`, `isExecutor()`
 
 ### 数据库 (db.ts)
 - SQLite 数据库存储在 `data/inspection.db`
+- 表：users、products、inspections、approvals
+- inspections 表包含 `submit_explanation`（提交说明）和 `rejected_to`（退回至）字段
 - 表：users、products、inspections
 - 首次启动自动创建表和默认用户
 
@@ -57,6 +61,19 @@ src/
 3. 主管审核 → 通过后状态: `qc_review`
 4. QC审核 → 通过后状态: `approved`
 5. 任何环节可驳回 → 状态: `rejected`
+6. 任何环节可退回 → 状态回退到上一级（`rejected_to` 记录退回目标角色）
+
+### 退回功能
+- 审核人可选择"退回"或"驳回"
+- 退回：记录退回到上一责任人，状态回退（如线长退回→辅助重新编辑）
+- 驳回：记录变为已驳回状态，辅助需修改后重新提交
+- 退回流程定义在 `REJECT_FLOW` 常量中
+
+### 提交说明
+- 当通过率不足100%时，必须填写提交说明原因
+- 新建检验时，如果有不通过项，系统会提示并强制填写说明
+- 详情页提交时，如果通过率<100%，弹窗要求填写说明
+- 说明存储在 `submit_explanation` 字段中
 
 ### 照片对比
 - 最多6个面（正面、背面、左侧、右侧、顶部、底部）
