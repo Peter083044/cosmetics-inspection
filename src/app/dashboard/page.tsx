@@ -16,6 +16,8 @@ interface Inspection {
   submit_explanation: string;
   rejected_to: string;
   created_at: string;
+  current_reviewer_name?: string;
+  submitted_at?: string;
 }
 
 interface User {
@@ -346,6 +348,12 @@ export default function DashboardPage() {
                     </span>
                   )}
                 </div>
+                {isAdmin && (item.current_reviewer_name || item.submitted_at) && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px', color: '#888', marginTop: '4px', paddingTop: '4px', borderTop: '1px dashed #eee' }}>
+                    <span>当前审核: {item.current_reviewer_name || '未指定'}</span>
+                    {item.submitted_at && <span>提交: {item.submitted_at.replace('T', ' ').substring(0, 16)}</span>}
+                  </div>
+                )}
                 {item.rejected_to && item.status !== 'rejected' && (
                   <div style={{ marginTop: '6px', fontSize: '11px', color: '#e65100', background: '#fff3e0', padding: '4px 8px', borderRadius: '4px' }}>
                     ↩️ 已退回给{ROLE_LABELS[item.rejected_to] || item.rejected_to}
