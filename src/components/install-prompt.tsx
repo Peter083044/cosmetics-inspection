@@ -114,11 +114,19 @@ export function InstallPrompt() {
                   </Button>
                   <Button
                     size="sm"
+                    variant="outline"
+                    onClick={() => { window.location.href = '/install'; }}
+                    className="text-blue-600 border-blue-200 text-xs"
+                  >
+                    安装指南
+                  </Button>
+                  <Button
+                    size="sm"
                     variant="ghost"
                     onClick={handleDismiss}
                     className="text-gray-500 text-xs"
                   >
-                    稍后再说
+                    稍后
                   </Button>
                 </div>
               </div>
