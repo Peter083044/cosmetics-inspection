@@ -804,7 +804,11 @@ export default function InspectionDetailPage({ params }: { params: Promise<{ id:
               <button
                 onClick={() => {
                   setShowReviewerSelect(false);
-                  handleSubmitForReview();
+                  if (pendingAction === 'approved') {
+                    confirmSubmitWithReviewer();
+                  } else {
+                    handleSubmitForReview();
+                  }
                 }}
                 disabled={!selectedReviewerId}
                 className="flex-1 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed"

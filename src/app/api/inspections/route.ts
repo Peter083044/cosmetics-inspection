@@ -147,20 +147,13 @@ export async function POST(request: NextRequest) {
 
     const imageToSave = work_order_image || instruction_order_image || null;
 
-    // 确定审核链路和初始状态
+    // 确定审核链路，初始状态为 draft（由辅助人员在详情页选择审核人后提交）
     const validLevels = ['line_leader', 'supervisor', 'qc'];
     const levels = Array.isArray(review_levels) && review_levels.length > 0
       ? review_levels.filter((l: string) => validLevels.includes(l))
       : ['line_leader', 'supervisor', 'qc'];
-    const firstLevel = levels[0];
-    const initialStatus = `${firstLevel}_review`;
 
-    // 自动选择下一级审核人员
-    const reviewer = db.prepare(`
-      SELECT id, name, username FROM users WHERE role = ? LIMIT 1
-    `).get(firstLevel) as { id: number; name: string; username: string } | undefined;
-
-    // 创建检验记录
+    // 创建检验记录（草稿状态，不自动分配审核人）
     const now = new Date().toISOString();
     const insertInspection = db.prepare(`
       INSERT INTO inspections (inspection_date, product_name, product_code, color_number, batch_number, work_order_image, comparisons, result, result_summary, submit_explanation, label_comparisons, review_levels, assistant_id, assistant_name, status, submitted_at, current_reviewer_id, current_reviewer_name)
@@ -182,10 +175,10 @@ export async function POST(request: NextRequest) {
       JSON.stringify(levels),
       user.id,
       user.name || user.username,
-      initialStatus,
-      now,
-      reviewer?.id || null,
-      reviewer?.name || reviewer?.username || null
+      'draft',
+      null,
+      null,
+      null
     );
 
     const inspectionId = inspectionResult.lastInsertRowid;

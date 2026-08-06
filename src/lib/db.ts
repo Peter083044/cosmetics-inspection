@@ -152,12 +152,36 @@ export function initDatabase() {
       inspection_id INTEGER NOT NULL REFERENCES inspections(id) ON DELETE CASCADE,
       reviewer_id INTEGER NOT NULL REFERENCES users(id),
       reviewer_role TEXT NOT NULL,
-      action TEXT NOT NULL CHECK(action IN ('approved', 'rejected', 'returned')),
+      action TEXT NOT NULL CHECK(action IN ('approved', 'rejected', 'returned', 'submitted')),
       comments TEXT,
       submit_reason TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )
   `);
+
+  // 迁移：如果 approvals 表的 action 约束不包含 'submitted'，则重建表
+  try {
+    const tableInfo = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='approvals'").get() as { sql: string } | undefined;
+    if (tableInfo && tableInfo.sql && !tableInfo.sql.includes("'submitted'")) {
+      db.exec(`
+        ALTER TABLE approvals RENAME TO approvals_old;
+        CREATE TABLE approvals (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          inspection_id INTEGER NOT NULL REFERENCES inspections(id) ON DELETE CASCADE,
+          reviewer_id INTEGER NOT NULL REFERENCES users(id),
+          reviewer_role TEXT NOT NULL,
+          action TEXT NOT NULL CHECK(action IN ('approved', 'rejected', 'returned', 'submitted')),
+          comments TEXT,
+          submit_reason TEXT,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+        INSERT INTO approvals SELECT * FROM approvals_old;
+        DROP TABLE approvals_old;
+      `);
+    }
+  } catch {
+    // 迁移失败时忽略（可能是首次创建）
+  }
 
   // 插入默认用户（如果不存在）
   const userCount = db.prepare('SELECT COUNT(*) as count FROM users').get() as any;

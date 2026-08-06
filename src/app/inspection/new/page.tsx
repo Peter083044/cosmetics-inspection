@@ -360,10 +360,10 @@ export default function NewInspectionPage() {
 
       const data = await res.json();
       if (data.success) {
-        alert('检验记录已提交，等待线长审核');
-        router.push('/dashboard');
+        // 跳转到详情页，由辅助人员选择审核人后提交
+        router.push(`/inspection/${data.inspectionId}`);
       } else {
-        alert(data.error || '提交失败');
+        alert(data.error || '保存失败');
       }
     } catch {
       alert('网络错误');
@@ -661,7 +661,7 @@ export default function NewInspectionPage() {
       {/* Submit Button */}
       <div style={{ padding: '12px 12px 24px 12px' }}>
         <button className="btn-primary" onClick={handleSubmit} disabled={loading} style={{ opacity: loading ? 0.7 : 1 }}>
-          {loading ? '提交中...' : '提交检验 → 线长审核'}
+          {loading ? '保存中...' : '保存并选择审核人'}
         </button>
       </div>
     </div>
