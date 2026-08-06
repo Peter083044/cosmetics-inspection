@@ -77,6 +77,7 @@ export function initDatabase() {
       rejected_to TEXT,
       label_comparisons TEXT,
       review_levels TEXT DEFAULT '["line_leader","supervisor","qc"]',
+      submitted_at DATETIME,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )
@@ -123,6 +124,12 @@ export function initDatabase() {
   // 审核级别选择
   try {
     db.exec(`ALTER TABLE inspections ADD COLUMN review_levels TEXT DEFAULT '["line_leader","supervisor","qc"]'`);
+  } catch {
+    // 字段已存在，忽略
+  }
+  // 提交时间
+  try {
+    db.exec(`ALTER TABLE inspections ADD COLUMN submitted_at DATETIME`);
   } catch {
     // 字段已存在，忽略
   }

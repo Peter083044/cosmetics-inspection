@@ -39,6 +39,10 @@ interface Inspection {
   status: string;
   assistant_name: string;
   created_at: string;
+  submitted_at?: string;
+  line_leader_time?: string;
+  supervisor_time?: string;
+  qc_time?: string;
 }
 
 interface User {
@@ -64,6 +68,30 @@ const ROLE_LABELS: Record<string, string> = {
   qc: 'QC',
   admin: '管理员',
 };
+
+// 格式化时间
+function formatTime(timeStr: string | undefined | null): string {
+  if (!timeStr) return '-';
+  const date = new Date(timeStr);
+  if (isNaN(date.getTime())) return timeStr;
+  return date.toLocaleString('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  });
+}
+
+// 计算时间差（分钟）
+function getTimeDiff(startTime: string | undefined | null, endTime: string | undefined | null): number | null {
+  if (!startTime || !endTime) return null;
+  const start = new Date(startTime);
+  const end = new Date(endTime);
+  if (isNaN(start.getTime()) || isNaN(end.getTime())) return null;
+  return Math.round((end.getTime() - start.getTime()) / 1000 / 60);
+}
 
 export default function InspectionDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
@@ -314,6 +342,52 @@ export default function InspectionDetailPage({ params }: { params: Promise<{ id:
               <div className="info-value">{inspection.assistant_name}</div>
             </div>
           </div>
+
+          {/* 时间线信息 */}
+          {(inspection.submitted_at || inspection.line_leader_time || inspection.supervisor_time || inspection.qc_time) && (
+            <div style={{ marginTop: '16px', padding: '12px', background: '#f8f9fa', borderRadius: '8px' }}>
+              <div style={{ fontSize: '13px', fontWeight: '600', marginBottom: '8px', color: '#333' }}>📅 审核时间线</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                {inspection.submitted_at && (
+                  <div style={{ display: 'flex', alignItems: 'center', fontSize: '12px' }}>
+                    <span style={{ color: '#666', minWidth: '60px' }}>提交时间:</span>
+                    <span style={{ color: '#333' }}>{formatTime(inspection.submitted_at)}</span>
+                  </div>
+                )}
+                {inspection.line_leader_time && (
+                  <div style={{ display: 'flex', alignItems: 'center', fontSize: '12px' }}>
+                    <span style={{ color: '#666', minWidth: '60px' }}>线长审核:</span>
+                    <span style={{ color: '#333' }}>{formatTime(inspection.line_leader_time)}</span>
+                    {inspection.submitted_at && (getTimeDiff(inspection.submitted_at, inspection.line_leader_time) ?? 0) > 5 && (
+                      <span style={{ marginLeft: '8px', color: '#f59e0b', fontSize: '11px' }}>⚠️ 超过5分钟</span>
+                    )}
+                  </div>
+                )}
+                {inspection.supervisor_time && (
+                  <div style={{ display: 'flex', alignItems: 'center', fontSize: '12px' }}>
+                    <span style={{ color: '#666', minWidth: '60px' }}>主管审核:</span>
+                    <span style={{ color: '#333' }}>{formatTime(inspection.supervisor_time)}</span>
+                    {(inspection.line_leader_time || inspection.submitted_at) && (
+                      (getTimeDiff(inspection.line_leader_time || inspection.submitted_at, inspection.supervisor_time) ?? 0) > 5 && (
+                        <span style={{ marginLeft: '8px', color: '#f59e0b', fontSize: '11px' }}>⚠️ 超过5分钟</span>
+                      )
+                    )}
+                  </div>
+                )}
+                {inspection.qc_time && (
+                  <div style={{ display: 'flex', alignItems: 'center', fontSize: '12px' }}>
+                    <span style={{ color: '#666', minWidth: '60px' }}>QC审核:</span>
+                    <span style={{ color: '#333' }}>{formatTime(inspection.qc_time)}</span>
+                    {(inspection.supervisor_time || inspection.line_leader_time || inspection.submitted_at) && (
+                      (getTimeDiff(inspection.supervisor_time || inspection.line_leader_time || inspection.submitted_at, inspection.qc_time) ?? 0) > 5 && (
+                        <span style={{ marginLeft: '8px', color: '#f59e0b', fontSize: '11px' }}>⚠️ 超过5分钟</span>
+                      )
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           {workOrderImage && (
             <div style={{ marginTop: '12px' }}>

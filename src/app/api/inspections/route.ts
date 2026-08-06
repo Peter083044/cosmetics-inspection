@@ -156,9 +156,10 @@ export async function POST(request: NextRequest) {
     const initialStatus = `${firstLevel}_review`;
 
     // 创建检验记录
+    const now = new Date().toISOString();
     const insertInspection = db.prepare(`
-      INSERT INTO inspections (inspection_date, product_name, product_code, color_number, batch_number, work_order_image, comparisons, result, result_summary, submit_explanation, label_comparisons, review_levels, assistant_id, assistant_name, status)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO inspections (inspection_date, product_name, product_code, color_number, batch_number, work_order_image, comparisons, result, result_summary, submit_explanation, label_comparisons, review_levels, assistant_id, assistant_name, status, submitted_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     const inspectionResult = insertInspection.run(
@@ -176,7 +177,8 @@ export async function POST(request: NextRequest) {
       JSON.stringify(levels),
       user.id,
       user.name || user.username,
-      initialStatus
+      initialStatus,
+      now
     );
 
     const inspectionId = inspectionResult.lastInsertRowid;

@@ -127,12 +127,12 @@ export async function POST(
         submitReason || submit_explanation || null
       );
 
-      // 更新状态到第一个审核级别
+      // 更新状态到第一个审核级别，同时更新提交时间
       const explanation = submitReason || submit_explanation || null;
       const initialStatus = `${firstLevel}_review`;
       db.prepare(`
         UPDATE inspections 
-        SET status = ?, submit_explanation = ?, updated_at = CURRENT_TIMESTAMP
+        SET status = ?, submit_explanation = ?, submitted_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
         WHERE id = ?
       `).run(initialStatus, explanation, inspectionId);
 
