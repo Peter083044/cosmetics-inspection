@@ -155,11 +155,16 @@ export async function POST(request: NextRequest) {
     const firstLevel = levels[0];
     const initialStatus = `${firstLevel}_review`;
 
+    // 自动选择下一级审核人员
+    const reviewer = db.prepare(`
+      SELECT id, name, username FROM users WHERE role = ? LIMIT 1
+    `).get(firstLevel) as { id: number; name: string; username: string } | undefined;
+
     // 创建检验记录
     const now = new Date().toISOString();
     const insertInspection = db.prepare(`
-      INSERT INTO inspections (inspection_date, product_name, product_code, color_number, batch_number, work_order_image, comparisons, result, result_summary, submit_explanation, label_comparisons, review_levels, assistant_id, assistant_name, status, submitted_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO inspections (inspection_date, product_name, product_code, color_number, batch_number, work_order_image, comparisons, result, result_summary, submit_explanation, label_comparisons, review_levels, assistant_id, assistant_name, status, submitted_at, current_reviewer_id, current_reviewer_name)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     const inspectionResult = insertInspection.run(
@@ -178,7 +183,9 @@ export async function POST(request: NextRequest) {
       user.id,
       user.name || user.username,
       initialStatus,
-      now
+      now,
+      reviewer?.id || null,
+      reviewer?.name || reviewer?.username || null
     );
 
     const inspectionId = inspectionResult.lastInsertRowid;

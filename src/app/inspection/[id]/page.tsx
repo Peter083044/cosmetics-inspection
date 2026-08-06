@@ -43,6 +43,7 @@ interface Inspection {
   line_leader_time?: string;
   supervisor_time?: string;
   qc_time?: string;
+  current_reviewer_name?: string;
 }
 
 interface User {
@@ -284,6 +285,13 @@ export default function InspectionDetailPage({ params }: { params: Promise<{ id:
           {STATUS_LABELS[inspection.status] || inspection.status}
         </span>
       </div>
+
+      {/* 当前审核人 */}
+      {inspection.current_reviewer_name && inspection.status.includes('_review') && (
+        <div style={{ padding: '8px 16px', background: '#e3f2fd', borderRadius: '8px', marginBottom: '12px', fontSize: '14px', color: '#1565c0' }}>
+          当前审核人：<strong>{inspection.current_reviewer_name}</strong>
+        </div>
+      )}
 
       {/* 退回/驳回提示 */}
       {inspection.status === 'rejected' && (

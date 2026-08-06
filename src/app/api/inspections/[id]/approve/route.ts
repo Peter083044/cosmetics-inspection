@@ -127,18 +127,28 @@ export async function POST(
         submitReason || submit_explanation || null
       );
 
-      // 更新状态到第一个审核级别，同时更新提交时间
+      // 更新状态到第一个审核级别，同时更新提交时间和审核人员
       const explanation = submitReason || submit_explanation || null;
       const initialStatus = `${firstLevel}_review`;
+      
+      // 查找第一级审核人员
+      const firstReviewer = db.prepare(
+        'SELECT id, name FROM users WHERE role = ? LIMIT 1'
+      ).get(firstLevel) as { id: number; name: string } | undefined;
+      const firstReviewerId = firstReviewer?.id || null;
+      const firstReviewerName = firstReviewer?.name || null;
+      
       db.prepare(`
         UPDATE inspections 
-        SET status = ?, submit_explanation = ?, submitted_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+        SET status = ?, submit_explanation = ?, submitted_at = CURRENT_TIMESTAMP, 
+            current_reviewer_id = ?, current_reviewer_name = ?, updated_at = CURRENT_TIMESTAMP
         WHERE id = ?
-      `).run(initialStatus, explanation, inspectionId);
+      `).run(initialStatus, explanation, firstReviewerId, firstReviewerName, inspectionId);
 
       return NextResponse.json({
         success: true,
         newStatus: initialStatus,
+        nextReviewer: firstReviewerName,
       });
     }
 
@@ -199,15 +209,30 @@ export async function POST(
       newStatus = getNextStatus(reviewLevels, user.role);
     }
 
+    // 查找下一级审核人员
+    let nextReviewerId: number | null = null;
+    let nextReviewerName: string | null = null;
+    if (newStatus !== 'approved' && newStatus !== 'rejected') {
+      const nextRole = newStatus.replace('_review', '');
+      const nextReviewer = db.prepare(
+        'SELECT id, name FROM users WHERE role = ? LIMIT 1'
+      ).get(nextRole) as { id: number; name: string } | undefined;
+      if (nextReviewer) {
+        nextReviewerId = nextReviewer.id;
+        nextReviewerName = nextReviewer.name;
+      }
+    }
+
     db.prepare(`
       UPDATE inspections 
-      SET status = ?, rejected_to = ?, updated_at = CURRENT_TIMESTAMP
+      SET status = ?, rejected_to = ?, current_reviewer_id = ?, current_reviewer_name = ?, updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
-    `).run(newStatus, rejectedTo, inspectionId);
+    `).run(newStatus, rejectedTo, nextReviewerId, nextReviewerName, inspectionId);
 
     return NextResponse.json({
       success: true,
       newStatus,
+      nextReviewer: nextReviewerName,
     });
   } catch (error) {
     console.error('Approve inspection error:', error);

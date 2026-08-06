@@ -133,6 +133,17 @@ export function initDatabase() {
   } catch {
     // 字段已存在，忽略
   }
+  // 当前审核人
+  try {
+    db.exec(`ALTER TABLE inspections ADD COLUMN current_reviewer_id INTEGER`);
+  } catch {
+    // 字段已存在，忽略
+  }
+  try {
+    db.exec(`ALTER TABLE inspections ADD COLUMN current_reviewer_name TEXT`);
+  } catch {
+    // 字段已存在，忽略
+  }
 
   // 审核记录表
   db.exec(`
