@@ -44,6 +44,7 @@ interface Inspection {
   supervisor_time?: string;
   qc_time?: string;
   current_reviewer_name?: string;
+  review_levels?: string[];
 }
 
 interface User {
@@ -105,6 +106,18 @@ export default function InspectionDetailPage({ params }: { params: Promise<{ id:
   const [rejectType, setRejectType] = useState<'rejected' | 'returned'>('returned');
   const [submitReason, setSubmitReason] = useState('');
   const [showSubmitModal, setShowSubmitModal] = useState(false);
+  const [selectedReviewerId, setSelectedReviewerId] = useState<number | null>(null);
+  const [availableReviewers, setAvailableReviewers] = useState<{ id: number; name: string; username: string }[]>([]);
+  const [showReviewerSelect, setShowReviewerSelect] = useState(false);
+  const [pendingAction, setPendingAction] = useState<'submitted' | 'approved' | null>(null);
+  const [nextRoleLabel, setNextRoleLabel] = useState('');
+
+  const getCurrentReviewerRole = (insp: Inspection): string => {
+    if (insp.status === 'line_leader_review') return 'line_leader';
+    if (insp.status === 'supervisor_review') return 'supervisor';
+    if (insp.status === 'qc_review') return 'qc';
+    return '';
+  };
 
   useEffect(() => {
     loadData();
@@ -130,8 +143,118 @@ export default function InspectionDetailPage({ params }: { params: Promise<{ id:
     }
   };
 
+  // 获取可审核人员列表
+  const fetchAvailableReviewers = async (role: string) => {
+    try {
+      const res = await fetch(`/api/users?role=${role}`);
+      const data = await res.json();
+      if (data.success) {
+        setAvailableReviewers(data.data || []);
+        setShowReviewerSelect(true);
+      }
+    } catch {
+      // ignore
+    }
+  };
+
+  // 获取下一级审核角色
+  const getNextReviewRole = (): string | null => {
+    if (!inspection?.review_levels || !Array.isArray(inspection.review_levels)) return null;
+    const levels = inspection.review_levels as string[];
+    const currentStatus = inspection.status;
+    
+    if (currentStatus === 'draft' || currentStatus === 'rejected') {
+      // 提交审核，找第一个审核级别
+      return levels[0] || null;
+    }
+    
+    const currentRoleMap: Record<string, string> = {
+      'line_leader_review': 'line_leader',
+      'supervisor_review': 'supervisor',
+      'qc_review': 'qc',
+    };
+    const currentRole = currentRoleMap[currentStatus];
+    if (!currentRole) return null;
+    
+    const currentIndex = levels.indexOf(currentRole);
+    if (currentIndex === -1 || currentIndex >= levels.length - 1) return null;
+    
+    return levels[currentIndex + 1];
+  };
+
+  // 打开审核人选择
+  const openReviewerSelect = () => {
+    const nextRole = getNextReviewRole();
+    if (!nextRole) {
+      alert('无法确定下一级审核人');
+      return;
+    }
+    fetchAvailableReviewers(nextRole);
+  };
+
+  // 确认选择审核人并提交
+  const confirmSubmitWithReviewer = async () => {
+    if (!inspection || !selectedReviewerId) {
+      alert('请选择审核人');
+      return;
+    }
+    
+    setShowReviewerSelect(false);
+    
+    if (pendingAction === 'approved') {
+      // 执行审核通过操作
+      try {
+        const res = await fetch(`/api/inspections/${inspection.id}/approve`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'approved', reviewer_id: selectedReviewerId })
+        });
+        const data = await res.json();
+        if (data.success) {
+          alert('审核通过');
+          router.refresh();
+        } else {
+          alert(data.error || '审核失败');
+        }
+      } catch (err) {
+        console.error('审核失败:', err);
+        alert('审核失败');
+      }
+    } else {
+      // 执行提交审核操作
+      setShowSubmitModal(true);
+    }
+  };
+
   const handleApprove = async () => {
     if (!inspection) return;
+    
+    // 确定下一级审核角色
+    const reviewLevels = inspection.review_levels || ['line_leader', 'supervisor', 'qc'];
+    const currentRole = getCurrentReviewerRole(inspection);
+    const currentIndex = reviewLevels.indexOf(currentRole);
+    const nextRole = currentIndex >= 0 && currentIndex < reviewLevels.length - 1 
+      ? reviewLevels[currentIndex + 1] 
+      : null;
+    
+    // 如果有下一级，先显示审核人选择
+    if (nextRole) {
+      const roleLabel: Record<string, string> = { line_leader: '线长', supervisor: '主管', qc: 'QC' };
+      try {
+        const res = await fetch(`/api/users?role=${nextRole}`);
+        const data = await res.json();
+        if (data.success && data.data.length > 0) {
+          setNextRoleLabel(roleLabel[nextRole] || nextRole);
+          setAvailableReviewers(data.data);
+          setSelectedReviewerId(data.data[0].id);
+          setShowReviewerSelect(true);
+          setPendingAction('approved');
+          return;
+        }
+      } catch { /* ignore */ }
+    }
+    
+    // 没有下一级或获取失败，直接审核通过
     setActionLoading(true);
     try {
       const res = await fetch(`/api/inspections/${inspection.id}/approve`, {
@@ -205,18 +328,29 @@ export default function InspectionDetailPage({ params }: { params: Promise<{ id:
       setShowSubmitModal(true);
       return;
     }
+    // Check if reviewer needs to be selected
+    if (!selectedReviewerId) {
+      setShowReviewerSelect(true);
+      return;
+    }
     setActionLoading(true);
     try {
       const res = await fetch(`/api/inspections/${inspection.id}/approve`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'submitted', submitReason: submitReason || undefined }),
+        body: JSON.stringify({ 
+          action: 'submitted', 
+          submitReason: submitReason || undefined,
+          reviewer_id: selectedReviewerId 
+        }),
       });
       const data = await res.json();
       if (data.success) {
         alert('已提交审核');
         setShowSubmitModal(false);
+        setShowReviewerSelect(false);
         setSubmitReason('');
+        setSelectedReviewerId(null);
         loadData();
       } else {
         alert(data.error || '操作失败');
@@ -534,8 +668,10 @@ export default function InspectionDetailPage({ params }: { params: Promise<{ id:
       {/* 辅助人员提交按钮 */}
       {canSubmit() && (
         <div style={{ padding: '12px 12px 24px 12px' }}>
-          <button className="btn-primary" onClick={handleSubmitForReview} disabled={actionLoading} style={{ width: '100%' }}>
-            {actionLoading ? '提交中...' : '📤 提交审核 → 线长审核'}
+          <button className="btn-primary" onClick={() => {
+            openReviewerSelect();
+          }} disabled={actionLoading} style={{ width: '100%' }}>
+            {actionLoading ? '提交中...' : '📤 提交审核'}
           </button>
         </div>
       )}
@@ -597,8 +733,73 @@ export default function InspectionDetailPage({ params }: { params: Promise<{ id:
               <button className="btn-secondary" onClick={() => { setShowSubmitModal(false); setSubmitReason(''); }} style={{ flex: 1 }}>
                 取消
               </button>
-              <button className="btn-primary" onClick={handleSubmitForReview} disabled={actionLoading || !submitReason.trim()} style={{ flex: 1 }}>
-                {actionLoading ? '提交中...' : '确认提交'}
+              <button className="btn-primary" onClick={() => {
+                setShowSubmitModal(false);
+                openReviewerSelect();
+              }} disabled={actionLoading || !submitReason.trim()} style={{ flex: 1 }}>
+                {actionLoading ? '提交中...' : '下一步'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 选择审核人弹窗 */}
+      {showReviewerSelect && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl max-w-md w-full p-6">
+            <h3 className="text-lg font-bold mb-4">选择审核人</h3>
+            <p className="text-sm text-gray-600 mb-4">
+              请选择下一级审核人员（{getNextReviewRole()}）
+            </p>
+            {availableReviewers.length === 0 ? (
+              <p className="text-sm text-gray-500 mb-4">暂无可选审核人</p>
+            ) : (
+              <div className="space-y-2 mb-4 max-h-60 overflow-y-auto">
+                {availableReviewers.map((reviewer) => (
+                  <label
+                    key={reviewer.id}
+                    className={`flex items-center p-3 rounded-lg border cursor-pointer transition-colors ${
+                      selectedReviewerId === reviewer.id
+                        ? 'border-blue-500 bg-blue-50'
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="reviewer"
+                      value={reviewer.id}
+                      checked={selectedReviewerId === reviewer.id}
+                      onChange={() => setSelectedReviewerId(reviewer.id)}
+                      className="mr-3"
+                    />
+                    <div>
+                      <div className="font-medium">{reviewer.name || reviewer.username}</div>
+                      <div className="text-xs text-gray-500">{reviewer.username}</div>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            )}
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setShowReviewerSelect(false);
+                  setSelectedReviewerId(null);
+                }}
+                className="flex-1 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+              >
+                取消
+              </button>
+              <button
+                onClick={() => {
+                  setShowReviewerSelect(false);
+                  handleSubmitForReview();
+                }}
+                disabled={!selectedReviewerId}
+                className="flex-1 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+              >
+                确认选择
               </button>
             </div>
           </div>

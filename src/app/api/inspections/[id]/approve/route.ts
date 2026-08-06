@@ -63,7 +63,7 @@ export async function POST(
       );
     }
 
-    const { action, comment, comments, submitReason, submit_explanation } = await request.json();
+    const { action, comment, comments, submitReason, submit_explanation, reviewer_id } = await request.json();
     const remark = comment || comments || null;
 
     if (!action || !['approved', 'rejected', 'returned', 'submitted'].includes(action)) {
@@ -131,12 +131,29 @@ export async function POST(
       const explanation = submitReason || submit_explanation || null;
       const initialStatus = `${firstLevel}_review`;
       
-      // 查找第一级审核人员
-      const firstReviewer = db.prepare(
-        'SELECT id, name FROM users WHERE role = ? LIMIT 1'
-      ).get(firstLevel) as { id: number; name: string } | undefined;
-      const firstReviewerId = firstReviewer?.id || null;
-      const firstReviewerName = firstReviewer?.name || null;
+      // 使用指定的审核人员，或自动查找第一级审核人员
+      let firstReviewerId: number | null = null;
+      let firstReviewerName: string | null = null;
+      
+      if (reviewer_id) {
+        // 使用指定的审核人员
+        const specifiedReviewer = db.prepare(
+          'SELECT id, name FROM users WHERE id = ? AND role = ?'
+        ).get(reviewer_id, firstLevel) as { id: number; name: string } | undefined;
+        if (specifiedReviewer) {
+          firstReviewerId = specifiedReviewer.id;
+          firstReviewerName = specifiedReviewer.name;
+        }
+      }
+      
+      if (!firstReviewerId) {
+        // 自动查找第一级审核人员
+        const firstReviewer = db.prepare(
+          'SELECT id, name FROM users WHERE role = ? LIMIT 1'
+        ).get(firstLevel) as { id: number; name: string } | undefined;
+        firstReviewerId = firstReviewer?.id || null;
+        firstReviewerName = firstReviewer?.name || null;
+      }
       
       db.prepare(`
         UPDATE inspections 
@@ -214,12 +231,27 @@ export async function POST(
     let nextReviewerName: string | null = null;
     if (newStatus !== 'approved' && newStatus !== 'rejected') {
       const nextRole = newStatus.replace('_review', '');
-      const nextReviewer = db.prepare(
-        'SELECT id, name FROM users WHERE role = ? LIMIT 1'
-      ).get(nextRole) as { id: number; name: string } | undefined;
-      if (nextReviewer) {
-        nextReviewerId = nextReviewer.id;
-        nextReviewerName = nextReviewer.name;
+      
+      if (reviewer_id) {
+        // 使用指定的审核人员
+        const specifiedReviewer = db.prepare(
+          'SELECT id, name FROM users WHERE id = ? AND role = ?'
+        ).get(reviewer_id, nextRole) as { id: number; name: string } | undefined;
+        if (specifiedReviewer) {
+          nextReviewerId = specifiedReviewer.id;
+          nextReviewerName = specifiedReviewer.name;
+        }
+      }
+      
+      if (!nextReviewerId) {
+        // 自动查找下一级审核人员
+        const nextReviewer = db.prepare(
+          'SELECT id, name FROM users WHERE role = ? LIMIT 1'
+        ).get(nextRole) as { id: number; name: string } | undefined;
+        if (nextReviewer) {
+          nextReviewerId = nextReviewer.id;
+          nextReviewerName = nextReviewer.name;
+        }
       }
     }
 

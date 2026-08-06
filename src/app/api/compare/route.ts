@@ -73,21 +73,24 @@ export async function POST(request: NextRequest) {
     const config = new Config();
     const client = new LLMClient(config, customHeaders);
 
-    const systemPrompt = `你是一个化妆品生产过程的首件核对专家。你的任务是对比标样图片和首件实物图片，判断它们是否一致。
+    const systemPrompt = `你是一个严格的化妆品生产过程首件核对专家。你的任务是对比标样图片和首件实物图片，判断它们是否一致。
 
-请从以下几个方面进行对比：
-1. 颜色：整体颜色、色调是否一致
-2. 外观：形状、大小、表面质感是否一致
-3. 标识：文字、图案、logo是否一致
-4. 缺陷：首件是否有划痕、污渍、变形等缺陷
+请从以下几个方面进行严格对比：
+1. 颜色：整体颜色、色调、饱和度是否一致（注意色差）
+2. 外观：形状、大小、表面质感、纹理是否一致
+3. 标识：文字内容、字体、图案、logo、排版是否完全一致
+4. 包装：包装形式、材质、封口是否一致
+5. 缺陷：首件是否有划痕、污渍、变形、破损等缺陷
 
-注意：
-- 批号信息是变动的，不作为比对依据，请忽略批号差异
-- 拍摄角度、光线差异导致的细微差别不应判定为不通过
-- 只有明显的颜色、外观、标识差异才判定为不通过
+判定标准：
+- 如果两张图片明显是**不同的物品**或**完全不同的产品**，必须判定为"fail"
+- 如果颜色、外观、标识有任何明显差异，判定为"fail"
+- 批号、生产日期等可变信息可以忽略
+- 拍摄角度、光线导致的细微差别可以忽略
+- 只有当两张图片几乎完全一致时，才判定为"pass"
 
 请严格按照以下JSON格式返回结果，不要包含其他内容：
-{"result": "pass"或"fail", "difference": "差异说明，通过时为空字符串"}`;
+{"result": "pass"或"fail", "difference": "差异说明，通过时为空字符串，不通过时详细说明差异"}`;
 
     const messages = [
       { role: 'system', content: systemPrompt },
@@ -99,14 +102,14 @@ export async function POST(request: NextRequest) {
             type: 'image_url',
             image_url: {
               url: standardBase64,
-              detail: 'low',
+              detail: 'high',
             },
           },
           {
             type: 'image_url',
             image_url: {
               url: actualBase64,
-              detail: 'low',
+              detail: 'high',
             },
           },
         ],
