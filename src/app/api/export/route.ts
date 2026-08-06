@@ -98,10 +98,7 @@ function generateCSV(data: any[]): string {
     '工单图片',
     '辅助人员',
     '检验结果',
-    '标签标样',
-    '标签首件',
-    '标签核对结果',
-    '标签差异说明',
+    '标签核对',
     '状态',
     '提交说明',
     '退回至',
@@ -142,6 +139,21 @@ function generateCSV(data: any[]): string {
       .map((e: any) => `[${e.severity}] ${e.description}${e.resolved ? '(已解决)' : '(未解决)'}`)
       .join('; ');
 
+    // 解析标签核对
+    let labelSummary = '';
+    if (item.label_comparisons) {
+      let labels: any[] = [];
+      if (typeof item.label_comparisons === 'string') {
+        try { labels = JSON.parse(item.label_comparisons); } catch { labels = []; }
+      } else {
+        labels = item.label_comparisons;
+      }
+      labelSummary = labels
+        .filter((lc: any) => lc.standard || lc.actual)
+        .map((lc: any) => `${lc.name || '标签'}: ${resultMap[lc.result] || lc.result || '未判定'}${lc.difference ? '(' + lc.difference + ')' : ''}`)
+        .join('; ');
+    }
+
     return [
       item.id,
       item.inspection_date || item.created_at.split(' ')[0],
@@ -152,10 +164,7 @@ function generateCSV(data: any[]): string {
       item.work_order_image || '',
       item.assistant_name,
       resultMap[item.result] || item.result || '',
-      item.label_standard || '',
-      item.label_actual || '',
-      resultMap[item.label_result] || item.label_result || '',
-      item.label_difference || '',
+      labelSummary,
       statusMap[item.status] || item.status,
       item.submit_explanation || '',
       item.rejected_to ? (roleMap[item.rejected_to] || item.rejected_to) : '',

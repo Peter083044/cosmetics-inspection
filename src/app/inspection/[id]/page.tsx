@@ -20,6 +20,14 @@ interface Inspection {
     result: string;
     difference: string;
   }>;
+  label_comparisons?: Array<{
+    index: number;
+    name: string;
+    standard: string;
+    actual: string;
+    result: string;
+    difference: string;
+  }>;
   label_standard?: string;
   label_actual?: string;
   label_result?: string;
@@ -153,10 +161,10 @@ export default function InspectionDetailPage({ params }: { params: Promise<{ id:
   const getPassRate = (): number => {
     if (!inspection) return 100;
     const activeComps = (inspection.comparisons || []).filter(c => c.standard || c.actual);
-    const hasLabel = inspection.label_standard || inspection.label_actual;
-    const totalItems = activeComps.length + (hasLabel ? 1 : 0);
+    const activeLabels = (inspection.label_comparisons || []).filter(lc => lc.standard || lc.actual);
+    const totalItems = activeComps.length + activeLabels.length;
     if (totalItems === 0) return 100;
-    const passCount = activeComps.filter(c => c.result === 'pass').length + (hasLabel && inspection.label_result === 'pass' ? 1 : 0);
+    const passCount = activeComps.filter(c => c.result === 'pass').length + activeLabels.filter(lc => lc.result === 'pass').length;
     return Math.round((passCount / totalItems) * 100);
   };
 
@@ -358,40 +366,45 @@ export default function InspectionDetailPage({ params }: { params: Promise<{ id:
         ))}
       </div>
 
-      {/* Label Comparison */}
-      {(inspection.label_standard || inspection.label_actual) && (
+      {/* Label Comparisons */}
+      {(inspection.label_comparisons || []).some((lc: any) => lc.standard || lc.actual) && (
         <div className="section">
           <div className="section-title">🏷️ 标签核对</div>
-          <div className="card">
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-              <div>
-                <div style={{ fontSize: '12px', color: '#666', marginBottom: '6px', fontWeight: '500' }}>标样标签</div>
-                {inspection.label_standard ? (
-                  <img src={inspection.label_standard} alt="标样标签" style={{ width: '100%', borderRadius: '8px' }} />
-                ) : (
-                  <div style={{ width: '100%', aspectRatio: '1', background: '#f5f5f5', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#999', fontSize: '12px' }}>未上传</div>
+          {(inspection.label_comparisons || [])
+            .filter((lc: any) => lc.standard || lc.actual)
+            .map((lc: any, idx: number) => (
+              <div className="card" key={idx}>
+                <div style={{ fontSize: '14px', fontWeight: '600', marginBottom: '8px' }}>{lc.name || `标签${idx + 1}`}</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                  <div>
+                    <div style={{ fontSize: '12px', color: '#666', marginBottom: '6px', fontWeight: '500' }}>标样标签</div>
+                    {lc.standard ? (
+                      <img src={lc.standard} alt={`${lc.name || '标签'}标样`} style={{ width: '100%', borderRadius: '8px' }} />
+                    ) : (
+                      <div style={{ width: '100%', aspectRatio: '1', background: '#f5f5f5', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#999', fontSize: '12px' }}>未上传</div>
+                    )}
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '12px', color: '#666', marginBottom: '6px', fontWeight: '500' }}>首件标签</div>
+                    {lc.actual ? (
+                      <img src={lc.actual} alt={`${lc.name || '标签'}首件`} style={{ width: '100%', borderRadius: '8px' }} />
+                    ) : (
+                      <div style={{ width: '100%', aspectRatio: '1', background: '#f5f5f5', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#999', fontSize: '12px' }}>未上传</div>
+                    )}
+                  </div>
+                </div>
+                {lc.result && (
+                  <div style={{ marginTop: '8px', display: 'inline-block', padding: '2px 8px', borderRadius: '4px', fontSize: '12px', background: lc.result === 'pass' ? '#e8f5e9' : '#ffebee', color: lc.result === 'pass' ? '#2e7d32' : '#d32f2f' }}>
+                    {lc.name || `标签${idx + 1}`}：{lc.result === 'pass' ? '通过' : '不通过'}
+                  </div>
+                )}
+                {lc.difference && (
+                  <div style={{ marginTop: '8px', padding: '8px', background: '#ffebee', borderRadius: '6px', fontSize: '12px', color: '#d32f2f' }}>
+                    <strong>差异说明：</strong>{lc.difference}
+                  </div>
                 )}
               </div>
-              <div>
-                <div style={{ fontSize: '12px', color: '#666', marginBottom: '6px', fontWeight: '500' }}>首件标签</div>
-                {inspection.label_actual ? (
-                  <img src={inspection.label_actual} alt="首件标签" style={{ width: '100%', borderRadius: '8px' }} />
-                ) : (
-                  <div style={{ width: '100%', aspectRatio: '1', background: '#f5f5f5', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#999', fontSize: '12px' }}>未上传</div>
-                )}
-              </div>
-            </div>
-            {inspection.label_result && (
-              <div style={{ marginTop: '8px', display: 'inline-block', padding: '2px 8px', borderRadius: '4px', fontSize: '12px', background: inspection.label_result === 'pass' ? '#e8f5e9' : '#ffebee', color: inspection.label_result === 'pass' ? '#2e7d32' : '#d32f2f' }}>
-                标签核对：{inspection.label_result === 'pass' ? '通过' : '不通过'}
-              </div>
-            )}
-            {inspection.label_difference && (
-              <div style={{ marginTop: '8px', padding: '8px', background: '#ffebee', borderRadius: '6px', fontSize: '12px', color: '#d32f2f' }}>
-                <strong>差异说明：</strong>{inspection.label_difference}
-              </div>
-            )}
-          </div>
+            ))}
         </div>
       )}
 

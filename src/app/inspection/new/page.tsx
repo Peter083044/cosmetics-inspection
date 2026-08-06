@@ -28,6 +28,22 @@ const SIDES = [
   { id: 6, name: '底部' },
 ];
 
+const LABEL_ITEMS = [
+  { id: 1, name: '标签1' },
+  { id: 2, name: '标签2' },
+  { id: 3, name: '标签3' },
+  { id: 4, name: '标签4' },
+];
+
+interface LabelComparison {
+  index: number;
+  name: string;
+  standard: string;
+  actual: string;
+  result: string;
+  difference: string;
+}
+
 export default function NewInspectionPage() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
@@ -46,11 +62,10 @@ export default function NewInspectionPage() {
     SIDES.map(s => ({ side: s.id, side_name: s.name, standard: '', actual: '', result: 'pass', difference: '' }))
   );
 
-  // Label comparison
-  const [labelStandard, setLabelStandard] = useState('');
-  const [labelActual, setLabelActual] = useState('');
-  const [labelResult, setLabelResult] = useState('pass');
-  const [labelDifference, setLabelDifference] = useState('');
+  // Label comparisons (up to 4 items)
+  const [labelComparisons, setLabelComparisons] = useState<LabelComparison[]>(
+    LABEL_ITEMS.map((l, i) => ({ index: l.id, name: l.name, standard: '', actual: '', result: 'pass', difference: '' }))
+  );
 
   const [resultSummary, setResultSummary] = useState('');
 
@@ -120,7 +135,7 @@ export default function NewInspectionPage() {
     input.click();
   };
 
-  const handleLabelUpload = (type: 'standard' | 'actual') => {
+  const handleLabelUpload = (labelIndex: number, type: 'standard' | 'actual') => {
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = 'image/*';
@@ -135,8 +150,9 @@ export default function NewInspectionPage() {
         const res = await fetch('/api/upload', { method: 'POST', body: formData });
         const data = await res.json();
         if (data.success) {
-          if (type === 'standard') setLabelStandard(data.url);
-          else setLabelActual(data.url);
+          setLabelComparisons(prev => prev.map((lc, i) =>
+            i === labelIndex ? { ...lc, [type]: data.url } : lc
+          ));
         }
       } catch {
         alert('上传失败');
@@ -160,15 +176,16 @@ export default function NewInspectionPage() {
     }
 
     const activeComparisons = comparisons.filter(c => c.standard || c.actual);
-    if (activeComparisons.length === 0 && !labelStandard && !labelActual) {
+    const activeLabels = labelComparisons.filter(lc => lc.standard || lc.actual);
+    if (activeComparisons.length === 0 && activeLabels.length === 0) {
       alert('请至少上传一组照片或标签照片');
       return;
     }
 
     // 计算通过率（包含标签核对）
-    const totalItems = activeComparisons.length + (labelStandard || labelActual ? 1 : 0);
-    const passItems = activeComparisons.filter(c => c.result === 'pass').length + (labelResult === 'pass' && (labelStandard || labelActual) ? 1 : 0);
-    const hasFail = activeComparisons.some(c => c.result === 'fail') || (labelResult === 'fail' && (labelStandard || labelActual));
+    const totalItems = activeComparisons.length + activeLabels.length;
+    const passItems = activeComparisons.filter(c => c.result === 'pass').length + activeLabels.filter(lc => lc.result === 'pass').length;
+    const hasFail = activeComparisons.some(c => c.result === 'fail') || activeLabels.some(lc => lc.result === 'fail');
     const passRate = totalItems > 0 ? ((passItems / totalItems) * 100).toFixed(0) : '100';
 
     // 通过率不足100%时，必须填写提交说明
@@ -191,10 +208,7 @@ export default function NewInspectionPage() {
           batch_number: batchNumber,
           instruction_order_image: instructionOrderImage,
           comparisons: activeComparisons,
-          label_standard: labelStandard || null,
-          label_actual: labelActual || null,
-          label_result: (labelStandard || labelActual) ? labelResult : null,
-          label_difference: labelResult === 'fail' ? labelDifference : null,
+          label_comparisons: labelComparisons.filter(lc => lc.standard || lc.actual),
           result: hasFail ? 'fail' : 'pass',
           result_summary: resultSummary || (hasFail ? '存在不通过项' : '全部通过'),
           submit_explanation: hasFail ? resultSummary : undefined,
@@ -334,67 +348,77 @@ export default function NewInspectionPage() {
         ))}
       </div>
 
-      {/* Section 2.5: Label Comparison */}
+      {/* Section 2.5: Label Comparisons (up to 4 items) */}
       <div className="section">
         <div className="section-title">🏷️ 标签核对</div>
-        <div className="card">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-            <span style={{ fontSize: '14px', fontWeight: '600' }}>标签对比</span>
-            <select
-              value={labelResult}
-              onChange={(e) => setLabelResult(e.target.value)}
-              style={{ padding: '4px 8px', borderRadius: '6px', border: '1px solid #e0e0e0', fontSize: '12px', background: labelResult === 'pass' ? '#e8f5e9' : '#ffebee', color: labelResult === 'pass' ? '#2e7d32' : '#d32f2f' }}
-            >
-              <option value="pass">✅ 通过</option>
-              <option value="fail">❌ 不通过</option>
-            </select>
-          </div>
+        {labelComparisons.map((lc, idx) => (
+          <div className="card" key={lc.index}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+              <span style={{ fontSize: '14px', fontWeight: '600' }}>{lc.name}</span>
+              <select
+                value={lc.result}
+                onChange={(e) => setLabelComparisons(prev => prev.map((item, i) =>
+                  i === idx ? { ...item, result: e.target.value } : item
+                ))}
+                style={{ padding: '4px 8px', borderRadius: '6px', border: '1px solid #e0e0e0', fontSize: '12px', background: lc.result === 'pass' ? '#e8f5e9' : '#ffebee', color: lc.result === 'pass' ? '#2e7d32' : '#d32f2f' }}
+              >
+                <option value="pass">✅ 通过</option>
+                <option value="fail">❌ 不通过</option>
+              </select>
+            </div>
 
-          <div className="comparison-row">
-            <div className="photo-side">
-              <div style={{ fontSize: '11px', color: '#999', marginBottom: '4px' }}>标样标签</div>
-              {labelStandard ? (
-                <div className="photo-preview">
-                  <img src={labelStandard} alt="标样标签" />
-                  <button onClick={() => setLabelStandard('')} style={{ position: 'absolute', top: '4px', right: '4px', background: 'rgba(0,0,0,0.6)', color: '#fff', border: 'none', borderRadius: '50%', width: '18px', height: '18px', cursor: 'pointer', fontSize: '10px' }}>✕</button>
-                </div>
-              ) : (
-                <div className="photo-upload-area" onClick={() => handleLabelUpload('standard')} style={{ padding: '12px' }}>
-                  <div style={{ fontSize: '24px' }}>🏷️</div>
-                  <div className="text" style={{ fontSize: '11px' }}>上传标样标签</div>
-                </div>
-              )}
+            <div className="comparison-row">
+              <div className="photo-side">
+                <div style={{ fontSize: '11px', color: '#999', marginBottom: '4px' }}>标样标签</div>
+                {lc.standard ? (
+                  <div className="photo-preview">
+                    <img src={lc.standard} alt={`${lc.name}标样`} />
+                    <button onClick={() => setLabelComparisons(prev => prev.map((item, i) =>
+                      i === idx ? { ...item, standard: '' } : item
+                    ))} style={{ position: 'absolute', top: '4px', right: '4px', background: 'rgba(0,0,0,0.6)', color: '#fff', border: 'none', borderRadius: '50%', width: '18px', height: '18px', cursor: 'pointer', fontSize: '10px' }}>✕</button>
+                  </div>
+                ) : (
+                  <div className="photo-upload-area" onClick={() => handleLabelUpload(idx, 'standard')} style={{ padding: '12px' }}>
+                    <div style={{ fontSize: '24px' }}>🏷️</div>
+                    <div className="text" style={{ fontSize: '11px' }}>上传标样</div>
+                  </div>
+                )}
+              </div>
+              <div className="photo-side">
+                <div style={{ fontSize: '11px', color: '#999', marginBottom: '4px' }}>首件标签</div>
+                {lc.actual ? (
+                  <div className="photo-preview">
+                    <img src={lc.actual} alt={`${lc.name}首件`} />
+                    <button onClick={() => setLabelComparisons(prev => prev.map((item, i) =>
+                      i === idx ? { ...item, actual: '' } : item
+                    ))} style={{ position: 'absolute', top: '4px', right: '4px', background: 'rgba(0,0,0,0.6)', color: '#fff', border: 'none', borderRadius: '50%', width: '18px', height: '18px', cursor: 'pointer', fontSize: '10px' }}>✕</button>
+                  </div>
+                ) : (
+                  <div className="photo-upload-area" onClick={() => handleLabelUpload(idx, 'actual')} style={{ padding: '12px' }}>
+                    <div style={{ fontSize: '24px' }}>🏷️</div>
+                    <div className="text" style={{ fontSize: '11px' }}>上传首件</div>
+                  </div>
+                )}
+              </div>
             </div>
-            <div className="photo-side">
-              <div style={{ fontSize: '11px', color: '#999', marginBottom: '4px' }}>首件标签</div>
-              {labelActual ? (
-                <div className="photo-preview">
-                  <img src={labelActual} alt="首件标签" />
-                  <button onClick={() => setLabelActual('')} style={{ position: 'absolute', top: '4px', right: '4px', background: 'rgba(0,0,0,0.6)', color: '#fff', border: 'none', borderRadius: '50%', width: '18px', height: '18px', cursor: 'pointer', fontSize: '10px' }}>✕</button>
-                </div>
-              ) : (
-                <div className="photo-upload-area" onClick={() => handleLabelUpload('actual')} style={{ padding: '12px' }}>
-                  <div style={{ fontSize: '24px' }}>🏷️</div>
-                  <div className="text" style={{ fontSize: '11px' }}>上传首件标签</div>
-                </div>
-              )}
-            </div>
-          </div>
 
-          {labelResult === 'fail' && (
-            <div style={{ marginTop: '8px' }}>
-              <label style={{ display: 'block', fontSize: '11px', color: '#d32f2f', marginBottom: '4px' }}>标签差异说明 *</label>
-              <textarea
-                className="input-box"
-                placeholder="请说明标签不通过的原因（文字差异、图案差异等）"
-                value={labelDifference}
-                onChange={(e) => setLabelDifference(e.target.value)}
-                rows={2}
-                style={{ resize: 'vertical' }}
-              />
-            </div>
-          )}
-        </div>
+            {lc.result === 'fail' && (
+              <div style={{ marginTop: '8px' }}>
+                <label style={{ display: 'block', fontSize: '11px', color: '#d32f2f', marginBottom: '4px' }}>{lc.name}差异说明 *</label>
+                <textarea
+                  className="input-box"
+                  placeholder={`请说明${lc.name}不通过的原因`}
+                  value={lc.difference}
+                  onChange={(e) => setLabelComparisons(prev => prev.map((item, i) =>
+                    i === idx ? { ...item, difference: e.target.value } : item
+                  ))}
+                  rows={2}
+                  style={{ resize: 'vertical' }}
+                />
+              </div>
+            )}
+          </div>
+        ))}
       </div>
 
       {/* Section 3: Summary & Pass Rate Warning */}
@@ -403,10 +427,10 @@ export default function NewInspectionPage() {
         <div className="card">
           {(() => {
             const activeComps = comparisons.filter(c => c.standard || c.actual);
-            const hasLabel = labelStandard || labelActual;
-            const totalItems = activeComps.length + (hasLabel ? 1 : 0);
-            const failCount = activeComps.filter(c => c.result === 'fail').length + (labelResult === 'fail' && hasLabel ? 1 : 0);
-            const passCount = activeComps.filter(c => c.result === 'pass').length + (labelResult === 'pass' && hasLabel ? 1 : 0);
+            const activeLabels = labelComparisons.filter(lc => lc.standard || lc.actual);
+            const totalItems = activeComps.length + activeLabels.length;
+            const failCount = activeComps.filter(c => c.result === 'fail').length + activeLabels.filter(lc => lc.result === 'fail').length;
+            const passCount = activeComps.filter(c => c.result === 'pass').length + activeLabels.filter(lc => lc.result === 'pass').length;
             const passRate = totalItems > 0 ? ((passCount / totalItems) * 100).toFixed(0) : '100';
             if (totalItems > 0 && failCount > 0) {
               return (
@@ -425,7 +449,7 @@ export default function NewInspectionPage() {
           <textarea
             className="input-box"
             placeholder={
-              (comparisons.filter(c => c.standard || c.actual).some(c => c.result === 'fail') || labelResult === 'fail')
+              (comparisons.filter(c => c.standard || c.actual).some(c => c.result === 'fail') || labelComparisons.some(lc => lc.result === 'fail'))
                 ? '通过率不足100%，请填写提交说明原因 *'
                 : '检验总结说明（可选）'
             }
