@@ -37,7 +37,7 @@ export default function AdminPage() {
   const router = useRouter();
   const [user, setUser] = useState<CurrentUser | null>(null);
   const [users, setUsers] = useState<User[]>([]);
-  const [activeTab, setActiveTab] = useState<'personnel' | 'export'>('personnel');
+  const [activeTab, setActiveTab] = useState<'personnel' | 'records' | 'export'>('personnel');
   const [loading, setLoading] = useState(true);
 
   // Add user form
@@ -257,6 +257,9 @@ export default function AdminPage() {
         <div className={`tab ${activeTab === 'personnel' ? 'active' : ''}`} onClick={() => setActiveTab('personnel')}>
           人员管理
         </div>
+        <div className={`tab ${activeTab === 'records' ? 'active' : ''}`} onClick={() => setActiveTab('records')}>
+          实时记录
+        </div>
         <div className={`tab ${activeTab === 'export' ? 'active' : ''}`} onClick={() => setActiveTab('export')}>
           数据导出
         </div>
@@ -333,6 +336,10 @@ export default function AdminPage() {
             ))}
           </div>
         </>
+      )}
+
+      {activeTab === 'records' && (
+        <AdminRecords />
       )}
 
       {activeTab === 'export' && (
@@ -476,6 +483,330 @@ export default function AdminPage() {
             <div style={{ display: 'flex', gap: '8px' }}>
               <button className="btn-secondary" onClick={() => setEditingUser(null)} style={{ flex: 1 }}>取消</button>
               <button className="btn-primary" onClick={handleEditUser} style={{ flex: 1 }}>保存</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============ 实时记录管理组件 ============
+interface InspectionRecord {
+  id: number;
+  product_name: string;
+  product_code: string;
+  status: string;
+  assistant_name: string;
+  current_reviewer_name: string | null;
+  result: string;
+  created_at: string;
+  submitted_at: string | null;
+  approved_at: string | null;
+}
+
+function AdminRecords() {
+  const [records, setRecords] = useState<InspectionRecord[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null);
+  const [batchDeleteConfirm, setBatchDeleteConfirm] = useState(false);
+  const [message, setMessage] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+
+  const STATUS_LABELS: Record<string, string> = {
+    draft: '草稿',
+    line_leader_review: '线长审核中',
+    supervisor_review: '主管审核中',
+    qc_review: 'QC审核中',
+    approved: '已通过',
+    rejected: '已驳回',
+  };
+
+  const STATUS_COLORS: Record<string, string> = {
+    draft: '#9e9e9e',
+    line_leader_review: '#FF9800',
+    supervisor_review: '#9C27B0',
+    qc_review: '#2196F3',
+    approved: '#4CAF50',
+    rejected: '#F44336',
+  };
+
+  const fetchRecords = async () => {
+    try {
+      const res = await fetch('/api/inspections');
+      const data = await res.json();
+      if (data.success) setRecords(data.data);
+    } catch (err) {
+      console.error('获取记录失败:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchRecords();
+  }, []);
+
+  const handleDelete = async (id: number) => {
+    try {
+      const res = await fetch('/api/inspections', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: [id] }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setMessage(`记录 #${id} 已删除`);
+        setRecords(prev => prev.filter(r => r.id !== id));
+        selectedIds.delete(id);
+        setSelectedIds(new Set(selectedIds));
+      } else {
+        setMessage(`删除失败: ${data.error}`);
+      }
+    } catch {
+      setMessage('删除失败');
+    }
+    setDeleteConfirm(null);
+    setTimeout(() => setMessage(''), 3000);
+  };
+
+  const handleBatchDelete = async () => {
+    if (selectedIds.size === 0) return;
+    try {
+      const res = await fetch('/api/inspections', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: Array.from(selectedIds) }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setMessage(`已删除 ${data.data.deletedCount} 条记录`);
+        setRecords(prev => prev.filter(r => !selectedIds.has(r.id)));
+        setSelectedIds(new Set());
+      } else {
+        setMessage(`批量删除失败: ${data.error}`);
+      }
+    } catch {
+      setMessage('批量删除失败');
+    }
+    setBatchDeleteConfirm(false);
+    setTimeout(() => setMessage(''), 3000);
+  };
+
+  const toggleSelect = (id: number) => {
+    const next = new Set(selectedIds);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    setSelectedIds(next);
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === filteredRecords.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filteredRecords.map(r => r.id)));
+    }
+  };
+
+  const filteredRecords = statusFilter === 'all'
+    ? records
+    : records.filter(r => r.status === statusFilter);
+
+  const formatDate = (dateStr: string | null) => {
+    if (!dateStr) return '-';
+    const d = new Date(dateStr);
+    return d.toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+  };
+
+  if (loading) {
+    return (
+      <div className="section">
+        <div style={{ textAlign: 'center', padding: '40px', color: '#666' }}>加载中...</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="section">
+      <div className="section-title">📋 检验记录管理</div>
+
+      {message && (
+        <div style={{
+          padding: '8px 12px', marginBottom: '12px', borderRadius: '6px',
+          backgroundColor: message.includes('失败') ? '#ffebee' : '#e8f5e9',
+          color: message.includes('失败') ? '#c62828' : '#2e7d32',
+          fontSize: '13px',
+        }}>
+          {message}
+        </div>
+      )}
+
+      {/* 筛选与操作栏 */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <span style={{ fontSize: '13px', color: '#666' }}>状态筛选:</span>
+          <select
+            value={statusFilter}
+            onChange={e => setStatusFilter(e.target.value)}
+            className="input"
+            style={{ padding: '4px 8px', fontSize: '13px', minWidth: '120px' }}
+          >
+            <option value="all">全部</option>
+            <option value="draft">草稿</option>
+            <option value="line_leader_review">线长审核中</option>
+            <option value="supervisor_review">主管审核中</option>
+            <option value="qc_review">QC审核中</option>
+            <option value="approved">已通过</option>
+            <option value="rejected">已驳回</option>
+          </select>
+        </div>
+        <span style={{ fontSize: '13px', color: '#999' }}>
+          共 {filteredRecords.length} 条记录
+        </span>
+        {selectedIds.size > 0 && (
+          <button
+            className="btn-secondary"
+            onClick={() => setBatchDeleteConfirm(true)}
+            style={{ marginLeft: 'auto', fontSize: '13px', color: '#d32f2f', borderColor: '#d32f2f' }}
+          >
+            批量删除 ({selectedIds.size})
+          </button>
+        )}
+      </div>
+
+      {/* 记录表格 */}
+      <div className="card" style={{ padding: 0, overflow: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+          <thead>
+            <tr style={{ borderBottom: '1px solid #e0e0e0', backgroundColor: '#fafafa' }}>
+              <th style={{ padding: '10px 12px', textAlign: 'left', width: '36px' }}>
+                <input
+                  type="checkbox"
+                  checked={filteredRecords.length > 0 && selectedIds.size === filteredRecords.length}
+                  onChange={toggleSelectAll}
+                />
+              </th>
+              <th style={{ padding: '10px 12px', textAlign: 'left' }}>ID</th>
+              <th style={{ padding: '10px 12px', textAlign: 'left' }}>产品名称</th>
+              <th style={{ padding: '10px 12px', textAlign: 'left' }}>产品编号</th>
+              <th style={{ padding: '10px 12px', textAlign: 'left' }}>状态</th>
+              <th style={{ padding: '10px 12px', textAlign: 'left' }}>结果</th>
+              <th style={{ padding: '10px 12px', textAlign: 'left' }}>创建人</th>
+              <th style={{ padding: '10px 12px', textAlign: 'left' }}>当前审核人</th>
+              <th style={{ padding: '10px 12px', textAlign: 'left' }}>创建时间</th>
+              <th style={{ padding: '10px 12px', textAlign: 'left' }}>提交时间</th>
+              <th style={{ padding: '10px 12px', textAlign: 'center' }}>操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filteredRecords.length === 0 ? (
+              <tr>
+                <td colSpan={11} style={{ padding: '30px', textAlign: 'center', color: '#999' }}>
+                  暂无记录
+                </td>
+              </tr>
+            ) : (
+              filteredRecords.map(record => (
+                <tr key={record.id} style={{ borderBottom: '1px solid #f0f0f0' }}>
+                  <td style={{ padding: '10px 12px' }}>
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(record.id)}
+                      onChange={() => toggleSelect(record.id)}
+                    />
+                  </td>
+                  <td style={{ padding: '10px 12px', fontWeight: 500 }}>#{record.id}</td>
+                  <td style={{ padding: '10px 12px' }}>{record.product_name}</td>
+                  <td style={{ padding: '10px 12px', fontFamily: 'monospace', fontSize: '12px' }}>{record.product_code}</td>
+                  <td style={{ padding: '10px 12px' }}>
+                    <span style={{
+                      display: 'inline-block',
+                      padding: '2px 8px',
+                      borderRadius: '10px',
+                      fontSize: '11px',
+                      fontWeight: 500,
+                      color: '#fff',
+                      backgroundColor: STATUS_COLORS[record.status] || '#999',
+                    }}>
+                      {STATUS_LABELS[record.status] || record.status}
+                    </span>
+                  </td>
+                  <td style={{ padding: '10px 12px' }}>
+                    <span style={{
+                      color: record.result === 'pass' ? '#2e7d32' : record.result === 'fail' ? '#c62828' : '#666',
+                      fontWeight: 500,
+                    }}>
+                      {record.result === 'pass' ? '通过' : record.result === 'fail' ? '不通过' : '-'}
+                    </span>
+                  </td>
+                  <td style={{ padding: '10px 12px' }}>{record.assistant_name || '-'}</td>
+                  <td style={{ padding: '10px 12px' }}>{record.current_reviewer_name || '-'}</td>
+                  <td style={{ padding: '10px 12px', fontSize: '12px', color: '#666' }}>{formatDate(record.created_at)}</td>
+                  <td style={{ padding: '10px 12px', fontSize: '12px', color: '#666' }}>{formatDate(record.submitted_at)}</td>
+                  <td style={{ padding: '10px 12px', textAlign: 'center' }}>
+                    <div style={{ display: 'flex', gap: '4px', justifyContent: 'center' }}>
+                      <button
+                        className="btn-secondary"
+                        onClick={() => window.open(`/inspection/${record.id}`, '_blank')}
+                        style={{ padding: '2px 8px', fontSize: '12px' }}
+                      >
+                        查看
+                      </button>
+                      <button
+                        className="btn-secondary"
+                        onClick={() => setDeleteConfirm(record.id)}
+                        style={{ padding: '2px 8px', fontSize: '12px', color: '#d32f2f', borderColor: '#d32f2f' }}
+                      >
+                        删除
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {/* 单条删除确认弹窗 */}
+      {deleteConfirm !== null && (
+        <div className="modal-overlay" onClick={() => setDeleteConfirm(null)}>
+          <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '400px' }}>
+            <div className="modal-header">
+              <h3>确认删除</h3>
+              <button className="modal-close" onClick={() => setDeleteConfirm(null)}>×</button>
+            </div>
+            <p style={{ padding: '16px 20px', color: '#333' }}>
+              确定要删除记录 <strong>#{deleteConfirm}</strong> 吗？<br />
+              <span style={{ fontSize: '12px', color: '#999' }}>删除后数据无法恢复，关联照片也将被清理。</span>
+            </p>
+            <div className="modal-footer">
+              <button className="btn-secondary" onClick={() => setDeleteConfirm(null)}>取消</button>
+              <button className="btn-primary" onClick={() => handleDelete(deleteConfirm)} style={{ backgroundColor: '#d32f2f' }}>
+                确认删除
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 批量删除确认弹窗 */}
+      {batchDeleteConfirm && (
+        <div className="modal-overlay" onClick={() => setBatchDeleteConfirm(false)}>
+          <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '400px' }}>
+            <div className="modal-header">
+              <h3>批量删除确认</h3>
+              <button className="modal-close" onClick={() => setBatchDeleteConfirm(false)}>×</button>
+            </div>
+            <p style={{ padding: '16px 20px', color: '#333' }}>
+              确定要删除选中的 <strong>{selectedIds.size}</strong> 条记录吗？<br />
+              <span style={{ fontSize: '12px', color: '#999' }}>删除后数据无法恢复，关联照片也将被清理。</span>
+            </p>
+            <div className="modal-footer">
+              <button className="btn-secondary" onClick={() => setBatchDeleteConfirm(false)}>取消</button>
+              <button className="btn-primary" onClick={handleBatchDelete} style={{ backgroundColor: '#d32f2f' }}>
+                确认批量删除
+              </button>
             </div>
           </div>
         </div>

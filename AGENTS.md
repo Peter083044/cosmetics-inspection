@@ -18,20 +18,25 @@ src/
 ├── app/
 │   ├── page.tsx              # 根页面（重定向到登录）
 │   ├── login/page.tsx        # 登录页面
-│   ├── dashboard/page.tsx    # 仪表盘（检验记录列表）
+│   ├── dashboard/page.tsx    # 仪表盘（检验记录列表，管理员可批量删除）
 │   ├── inspection/
-│   │   ├── new/page.tsx      # 新建检验
-│   │   └── [id]/page.tsx     # 检验详情与审核
-│   ├── admin/page.tsx        # 用户管理（管理员）
+│   │   ├── new/page.tsx      # 新建检验（保存为草稿）
+│   │   └── [id]/page.tsx     # 检验详情与审核（管理员可删除）
+│   ├── admin/
+│   │   ├── page.tsx          # 管理后台（人员管理/实时记录/数据导出）
+│   │   └── archive/page.tsx  # 归档管理（导出ZIP/清理记录/磁盘监控）
 │   └── api/
 │       ├── auth/route.ts     # 登录/登出/获取当前用户
 │       ├── users/route.ts    # 用户CRUD
 │       ├── users/batch/route.ts # 批量创建用户
-│       ├── inspections/route.ts      # 检验记录CRUD
+│       ├── inspections/route.ts      # 检验记录CRUD（含管理员删除）
 │       ├── inspections/[id]/approve/ # 审核操作
 │       ├── products/route.ts # 产品信息
 │       ├── upload/route.ts   # 文件上传
-│       └── export/route.ts   # 记录导出
+│       ├── export/route.ts   # CSV导出
+│       ├── archive/route.ts  # 归档导出（ZIP打包）
+│       ├── cleanup/route.ts  # 记录清理
+│       └── storage/route.ts  # 磁盘用量查询
 ├── lib/
 │   ├── auth.ts               # 认证逻辑（JWT、密码哈希）
 │   └── db.ts                 # 数据库初始化与连接
@@ -102,6 +107,25 @@ src/
 - 支持按角色批量创建（辅助/线长/主管/QC）
 - 用户名自动生成（角色前缀+序号）
 - 统一设置默认密码
+
+### 管理后台（/admin）
+三个标签页：
+1. **人员管理** — 用户列表、添加/编辑/删除用户、批量创建
+2. **实时记录** — 查看所有检验记录，含状态筛选、批量删除
+3. **数据导出** — CSV/Excel 导出
+
+### 归档管理（/admin/archive）
+- **存储概览** — 项目空间、数据记录、照片存储的实时用量
+- **归档导出** — 按日期范围将记录+照片打包为 ZIP 下载
+- **记录清理** — 删除已归档的记录和照片，释放磁盘空间
+- **磁盘告警** — 超过 3GB 阈值时显示红色警告
+
+### 管理员删除权限
+- 管理员可在详情页删除单条记录
+- 管理员可在仪表盘批量删除记录
+- 管理员可在实时记录标签页筛选并删除
+- 删除时自动清理关联照片（仅当无其他记录引用时）
+- 所有删除操作需二次确认
 
 ## 默认账号
 | 角色 | 用户名 | 密码 |
