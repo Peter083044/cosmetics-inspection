@@ -230,6 +230,26 @@ export default function AdminPage() {
             </div>
           </div>
 
+          {/* Default Accounts (Admin Only) */}
+          <div className="section">
+            <div className="section-title">🔑 默认测试账号</div>
+            <div className="card" style={{ padding: '12px' }}>
+              <div style={{ fontSize: '11px', color: '#999', marginBottom: '8px' }}>以下账号仅供测试，正式使用请修改密码或创建新账号</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', fontSize: '12px' }}>
+                <div style={{ color: '#666' }}>管理员: admin</div>
+                <div style={{ color: '#666' }}>密码: admin123</div>
+                <div style={{ color: '#666' }}>辅助: assistant1</div>
+                <div style={{ color: '#666' }}>密码: pass123</div>
+                <div style={{ color: '#666' }}>线长: leader1</div>
+                <div style={{ color: '#666' }}>密码: pass123</div>
+                <div style={{ color: '#666' }}>主管: supervisor1</div>
+                <div style={{ color: '#666' }}>密码: pass123</div>
+                <div style={{ color: '#666' }}>QC: qc1</div>
+                <div style={{ color: '#666' }}>密码: pass123</div>
+              </div>
+            </div>
+          </div>
+
           {/* Action Buttons */}
           <div style={{ padding: '0 12px', display: 'flex', gap: '8px', marginBottom: '12px' }}>
             <button className="btn-primary" style={{ flex: 1, padding: '10px' }} onClick={() => setShowAddForm(true)}>

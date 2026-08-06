@@ -108,23 +108,6 @@ export default function LoginPage() {
               {loading ? '登录中...' : '登 录'}
             </button>
           </form>
-
-          {/* Role Info */}
-          <div style={{ marginTop: '20px', padding: '12px', background: '#f5f5f5', borderRadius: '8px' }}>
-            <div style={{ fontSize: '11px', color: '#999', textAlign: 'center', marginBottom: '8px' }}>默认测试账号</div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px', fontSize: '11px' }}>
-              <div style={{ color: '#666' }}>👤 管理员: admin</div>
-              <div style={{ color: '#666' }}>🔑 admin123</div>
-              <div style={{ color: '#666' }}>👤 辅助: assistant1</div>
-              <div style={{ color: '#666' }}>🔑 pass123</div>
-              <div style={{ color: '#666' }}>👤 线长: leader1</div>
-              <div style={{ color: '#666' }}>🔑 pass123</div>
-              <div style={{ color: '#666' }}>👤 主管: supervisor1</div>
-              <div style={{ color: '#666' }}>🔑 pass123</div>
-              <div style={{ color: '#666' }}>👤 QC: qc1</div>
-              <div style={{ color: '#666' }}>🔑 pass123</div>
-            </div>
-          </div>
         </div>
 
         <div style={{ textAlign: 'center', marginTop: '16px' }}>
