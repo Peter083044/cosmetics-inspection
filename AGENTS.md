@@ -26,6 +26,7 @@ src/
 │   └── api/
 │       ├── auth/route.ts     # 登录/登出/获取当前用户
 │       ├── users/route.ts    # 用户CRUD
+│       ├── users/batch/route.ts # 批量创建用户
 │       ├── inspections/route.ts      # 检验记录CRUD
 │       ├── inspections/[id]/approve/ # 审核操作
 │       ├── products/route.ts # 产品信息
@@ -63,6 +64,12 @@ src/
 - 判定结果：通过/不通过
 - 不通过需填写差异说明
 - 批号信息不参与比对
+
+### 批量创建账号
+- 管理员可在后台批量创建账号
+- 支持按角色批量创建（辅助/线长/主管/QC）
+- 用户名自动生成（角色前缀+序号）
+- 统一设置默认密码
 
 ## 默认账号
 | 角色 | 用户名 | 密码 |
