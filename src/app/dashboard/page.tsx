@@ -93,6 +93,43 @@ export default function DashboardPage() {
     router.push('/login');
   };
 
+  // 切换账号功能
+  const [showSwitchModal, setShowSwitchModal] = useState(false);
+  const [recentAccounts, setRecentAccounts] = useState<Array<{username: string; name: string; role: string; password: string}>>([]);
+
+  useEffect(() => {
+    // 从 localStorage 读取最近登录的账号
+    try {
+      const stored = localStorage.getItem('recent-accounts');
+      if (stored) {
+        setRecentAccounts(JSON.parse(stored));
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  const handleSwitchAccount = async (username: string, password: string) => {
+    try {
+      // 先登出当前账号
+      await fetch('/api/auth', { method: 'DELETE' });
+      // 直接用保存的密码登录
+      const res = await fetch('/api/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password }),
+      });
+      if (res.ok) {
+        router.push('/dashboard');
+        router.refresh();
+      } else {
+        alert('切换失败，密码可能已更改');
+      }
+    } catch {
+      alert('切换失败');
+    }
+  };
+
   const handleChangePassword = async () => {
     setPwdMsg('');
     if (!oldPwd || !newPwd) {
@@ -145,12 +182,15 @@ export default function DashboardPage() {
           <div className="title">检验记录</div>
           <div className="sub">化妆品首件核对系统</div>
         </div>
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
           {user && (
             <span style={{ fontSize: '12px', background: 'rgba(255,255,255,0.2)', padding: '4px 10px', borderRadius: '12px' }}>
               {user.name} · {ROLE_LABELS[user.role] || user.role}
             </span>
           )}
+          <button onClick={() => setShowSwitchModal(true)} style={{ background: 'rgba(255,255,255,0.2)', border: 'none', color: '#fff', padding: '6px 12px', borderRadius: '8px', fontSize: '12px', cursor: 'pointer' }}>
+            切换账号
+          </button>
           <button onClick={handleLogout} style={{ background: 'rgba(255,255,255,0.2)', border: 'none', color: '#fff', padding: '6px 12px', borderRadius: '8px', fontSize: '12px', cursor: 'pointer' }}>
             退出
           </button>
@@ -236,6 +276,56 @@ export default function DashboardPage() {
           })
         )}
       </div>
+
+      {/* 切换账号弹窗 */}
+      {showSwitchModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' }}>
+          <div style={{ background: '#fff', borderRadius: '16px', padding: '24px', width: '100%', maxWidth: '360px' }}>
+            <h3 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '16px' }}>切换账号</h3>
+            {recentAccounts.length === 0 ? (
+              <p style={{ color: '#666', textAlign: 'center', padding: '20px 0' }}>暂无已保存的账号</p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '300px', overflowY: 'auto' }}>
+                {recentAccounts.map((acc: {username: string; name: string; role: string; password: string}, idx: number) => (
+                  <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px', background: acc.username === user?.username ? '#e3f2fd' : '#f8f9fa', borderRadius: '10px', border: acc.username === user?.username ? '1px solid #2196f3' : '1px solid #eee' }}>
+                    <div>
+                      <div style={{ fontWeight: 'bold', fontSize: '14px' }}>{acc.name || acc.username}</div>
+                      <div style={{ fontSize: '12px', color: '#666' }}>{acc.username} · {ROLE_LABELS[acc.role] || acc.role}</div>
+                    </div>
+                    {acc.username === user?.username ? (
+                      <span style={{ fontSize: '12px', color: '#2196f3', fontWeight: 'bold' }}>当前</span>
+                    ) : (
+                      <button
+                        onClick={async () => {
+                          const res = await fetch('/api/auth', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ username: acc.username, password: acc.password }),
+                          });
+                          const data = await res.json();
+                          if (data.success) {
+                            setUser(data.user);
+                            setShowSwitchModal(false);
+                            router.refresh();
+                          } else {
+                            alert(data.error || '切换失败，密码可能已修改');
+                          }
+                        }}
+                        style={{ background: '#2196f3', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: '8px', fontSize: '12px', cursor: 'pointer' }}
+                      >
+                        切换
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+            <button onClick={() => setShowSwitchModal(false)} style={{ width: '100%', padding: '12px', background: '#f0f0f0', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: 'bold', marginTop: '16px', cursor: 'pointer' }}>
+              关闭
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* 修改密码弹窗 */}
       {showPwdModal && (

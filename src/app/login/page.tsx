@@ -25,6 +25,19 @@ export default function LoginPage() {
       const data = await res.json();
 
       if (data.success) {
+        // 保存账号信息到 localStorage（用于切换账号）
+        try {
+          const stored = localStorage.getItem('recent-accounts');
+          const accounts: Array<{ username: string; name: string; role: string; password: string }> = stored ? JSON.parse(stored) : [];
+          // 移除已存在的相同账号
+          const filtered = accounts.filter(a => a.username !== username);
+          // 添加到开头
+          filtered.unshift({ username, name: data.user.name, role: data.user.role, password });
+          // 最多保存5个账号
+          localStorage.setItem('recent-accounts', JSON.stringify(filtered.slice(0, 5)));
+        } catch {
+          // ignore
+        }
         if (data.user.role === 'admin') {
           router.push('/admin');
         } else {

@@ -4,7 +4,7 @@ import { cookies } from 'next/headers';
 import db from './db';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'first-piece-inspection-secret-key-2024';
-const TOKEN_EXPIRY = '24h';
+const TOKEN_EXPIRY = '30d'; // 30天有效期，实现自动登录
 
 // 用户角色定义
 export const ROLES = {
