@@ -53,6 +53,14 @@ export default function AdminPage() {
   const [batchCount, setBatchCount] = useState(10);
   const [batchPassword, setBatchPassword] = useState('pass123');
 
+  // Edit user
+  const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [editUsername, setEditUsername] = useState('');
+  const [editName, setEditName] = useState('');
+  const [editRole, setEditRole] = useState('assistant');
+  const [editPassword, setEditPassword] = useState('');
+  const [editMsg, setEditMsg] = useState('');
+
   // Export
   const [exportType, setExportType] = useState<'csv' | 'excel'>('csv');
   const [exportStatus, setExportStatus] = useState('all');
@@ -131,6 +139,42 @@ export default function AdminPage() {
       }
     } catch {
       alert('网络错误');
+    }
+  };
+
+  const openEditModal = (u: User) => {
+    setEditingUser(u);
+    setEditUsername(u.username);
+    setEditName(u.name);
+    setEditRole(u.role);
+    setEditPassword('');
+    setEditMsg('');
+  };
+
+  const handleEditUser = async () => {
+    if (!editingUser) return;
+    try {
+      const res = await fetch('/api/users', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: editingUser.id,
+          username: editUsername,
+          name: editName,
+          role: editRole,
+          ...(editPassword ? { password: editPassword } : {}),
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setEditMsg('修改成功');
+        loadData();
+        setTimeout(() => { setEditingUser(null); setEditMsg(''); }, 1000);
+      } else {
+        setEditMsg(data.error || '修改失败');
+      }
+    } catch {
+      setEditMsg('网络错误');
     }
   };
 
@@ -272,6 +316,9 @@ export default function AdminPage() {
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <span className="role-tag" style={{ background: ROLE_COLORS[u.role] }}>{ROLE_LABELS[u.role]}</span>
+                    <button onClick={() => openEditModal(u)} style={{ background: 'none', border: '1px solid #1976d2', color: '#1976d2', cursor: 'pointer', fontSize: '12px', padding: '4px 8px', borderRadius: '4px' }}>
+                      编辑
+                    </button>
                     {u.role !== 'admin' && (
                       <button onClick={() => handleDeleteUser(u.id)} style={{ background: 'none', border: '1px solid #d32f2f', color: '#d32f2f', cursor: 'pointer', fontSize: '12px', padding: '4px 8px', borderRadius: '4px' }}>
                         删除
@@ -390,6 +437,42 @@ export default function AdminPage() {
             <div style={{ display: 'flex', gap: '10px' }}>
               <button className="btn-secondary" onClick={() => setShowBatchForm(false)} style={{ flex: 1 }}>取消</button>
               <button className="btn-primary" onClick={handleBatchCreate} style={{ flex: 1 }}>确认创建</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit User Modal */}
+      {editingUser && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '16px' }}>
+          <div className="card" style={{ width: '100%', maxWidth: '400px' }}>
+            <div className="section-title">编辑用户</div>
+            <div style={{ marginBottom: '12px' }}>
+              <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '4px' }}>用户名</label>
+              <input type="text" value={editUsername} onChange={e => setEditUsername(e.target.value)} className="input" />
+            </div>
+            <div style={{ marginBottom: '12px' }}>
+              <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '4px' }}>姓名</label>
+              <input type="text" value={editName} onChange={e => setEditName(e.target.value)} className="input" />
+            </div>
+            <div style={{ marginBottom: '12px' }}>
+              <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '4px' }}>角色</label>
+              <select value={editRole} onChange={e => setEditRole(e.target.value)} className="input">
+                <option value="assistant">辅助</option>
+                <option value="line_leader">线长</option>
+                <option value="supervisor">主管</option>
+                <option value="qc">QC</option>
+                <option value="admin">管理员</option>
+              </select>
+            </div>
+            <div style={{ marginBottom: '12px' }}>
+              <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '4px' }}>新密码（留空则不修改）</label>
+              <input type="password" value={editPassword} onChange={e => setEditPassword(e.target.value)} className="input" placeholder="留空不修改密码" />
+            </div>
+            {editMsg && <div style={{ fontSize: '12px', color: editMsg.includes('成功') ? '#2e7d32' : '#d32f2f', marginBottom: '12px' }}>{editMsg}</div>}
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button className="btn-secondary" onClick={() => setEditingUser(null)} style={{ flex: 1 }}>取消</button>
+              <button className="btn-primary" onClick={handleEditUser} style={{ flex: 1 }}>保存</button>
             </div>
           </div>
         </div>

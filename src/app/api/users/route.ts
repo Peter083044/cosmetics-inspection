@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getCurrentUser } from '@/lib/auth';
+import { getCurrentUser, isAdmin, hashPassword } from '@/lib/auth';
 import db, { initDatabase } from '@/lib/db';
 
 initDatabase();
@@ -142,6 +142,92 @@ export async function DELETE(request: NextRequest) {
     console.error('Delete user error:', error);
     return NextResponse.json(
       { error: '删除用户失败' },
+      { status: 500 }
+    );
+  }
+}
+
+// PUT - 管理员编辑用户信息
+export async function PUT(request: NextRequest) {
+  try {
+    const user = await getCurrentUser();
+    if (!user || !isAdmin(user.role)) {
+      return NextResponse.json(
+        { error: '无权限' },
+        { status: 403 }
+      );
+    }
+
+    const body = await request.json();
+    const { id, username, name, role, password } = body;
+
+    if (!id) {
+      return NextResponse.json(
+        { error: '缺少用户ID' },
+        { status: 400 }
+      );
+    }
+
+    const existingUser = db.prepare('SELECT * FROM users WHERE id = ?').get(id) as any;
+
+    if (!existingUser) {
+      return NextResponse.json(
+        { error: '用户不存在' },
+        { status: 404 }
+      );
+    }
+
+    // 如果修改用户名，检查是否重复
+    if (username && username !== existingUser.username) {
+      const usernameExists = db.prepare('SELECT id FROM users WHERE username = ? AND id != ?').get(username, id);
+      if (usernameExists) {
+        return NextResponse.json(
+          { error: '用户名已存在' },
+          { status: 400 }
+        );
+      }
+    }
+
+    // 构建更新语句
+    const updates: string[] = [];
+    const values: any[] = [];
+
+    if (username !== undefined) {
+      updates.push('username = ?');
+      values.push(username);
+    }
+    if (name !== undefined) {
+      updates.push('name = ?');
+      values.push(name);
+    }
+    if (role !== undefined) {
+      updates.push('role = ?');
+      values.push(role);
+    }
+    if (password) {
+      const hashedPassword = await hashPassword(password);
+      updates.push('password = ?');
+      values.push(hashedPassword);
+    }
+
+    if (updates.length === 0) {
+      return NextResponse.json(
+        { error: '没有要更新的字段' },
+        { status: 400 }
+      );
+    }
+
+    values.push(id);
+    db.prepare(`UPDATE users SET ${updates.join(', ')} WHERE id = ?`).run(...values);
+
+    return NextResponse.json({
+      success: true,
+      message: '用户信息更新成功',
+    });
+  } catch (error) {
+    console.error('Update user error:', error);
+    return NextResponse.json(
+      { error: '更新用户失败' },
       { status: 500 }
     );
   }

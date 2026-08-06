@@ -48,6 +48,11 @@ export default function DashboardPage() {
   const [inspections, setInspections] = useState<Inspection[]>([]);
   const [activeTab, setActiveTab] = useState<'pending' | 'all'>('pending');
   const [loading, setLoading] = useState(true);
+  const [showPwdModal, setShowPwdModal] = useState(false);
+  const [oldPwd, setOldPwd] = useState('');
+  const [newPwd, setNewPwd] = useState('');
+  const [confirmPwd, setConfirmPwd] = useState('');
+  const [pwdMsg, setPwdMsg] = useState('');
 
   useEffect(() => {
     fetchUser();
@@ -88,6 +93,44 @@ export default function DashboardPage() {
     router.push('/login');
   };
 
+  const handleChangePassword = async () => {
+    setPwdMsg('');
+    if (!oldPwd || !newPwd) {
+      setPwdMsg('请填写完整');
+      return;
+    }
+    if (newPwd !== confirmPwd) {
+      setPwdMsg('两次密码不一致');
+      return;
+    }
+    if (newPwd.length < 6) {
+      setPwdMsg('新密码至少6个字符');
+      return;
+    }
+    try {
+      const res = await fetch('/api/auth', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ oldPassword: oldPwd, newPassword: newPwd }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setPwdMsg('密码修改成功');
+        setTimeout(() => {
+          setShowPwdModal(false);
+          setOldPwd('');
+          setNewPwd('');
+          setConfirmPwd('');
+          setPwdMsg('');
+        }, 1500);
+      } else {
+        setPwdMsg(data.error || '修改失败');
+      }
+    } catch {
+      setPwdMsg('网络错误');
+    }
+  };
+
   const filteredInspections = activeTab === 'pending'
     ? inspections.filter(i => i.status !== 'approved' && i.status !== 'rejected')
     : inspections;
@@ -110,6 +153,9 @@ export default function DashboardPage() {
           )}
           <button onClick={handleLogout} style={{ background: 'rgba(255,255,255,0.2)', border: 'none', color: '#fff', padding: '6px 12px', borderRadius: '8px', fontSize: '12px', cursor: 'pointer' }}>
             退出
+          </button>
+          <button onClick={() => setShowPwdModal(true)} style={{ background: 'rgba(255,255,255,0.2)', border: 'none', color: '#fff', padding: '6px 12px', borderRadius: '8px', fontSize: '12px', cursor: 'pointer' }}>
+            修改密码
           </button>
         </div>
       </div>
@@ -190,6 +236,55 @@ export default function DashboardPage() {
           })
         )}
       </div>
+
+      {/* 修改密码弹窗 */}
+      {showPwdModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' }}>
+          <div style={{ background: '#fff', borderRadius: '16px', padding: '24px', width: '100%', maxWidth: '360px' }}>
+            <h3 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '16px' }}>修改密码</h3>
+            <input
+              type="password"
+              placeholder="当前密码"
+              value={oldPwd}
+              onChange={e => setOldPwd(e.target.value)}
+              style={{ width: '100%', padding: '10px 12px', border: '1px solid #ddd', borderRadius: '8px', marginBottom: '12px', fontSize: '14px' }}
+            />
+            <input
+              type="password"
+              placeholder="新密码（至少6位）"
+              value={newPwd}
+              onChange={e => setNewPwd(e.target.value)}
+              style={{ width: '100%', padding: '10px 12px', border: '1px solid #ddd', borderRadius: '8px', marginBottom: '12px', fontSize: '14px' }}
+            />
+            <input
+              type="password"
+              placeholder="确认新密码"
+              value={confirmPwd}
+              onChange={e => setConfirmPwd(e.target.value)}
+              style={{ width: '100%', padding: '10px 12px', border: '1px solid #ddd', borderRadius: '8px', marginBottom: '12px', fontSize: '14px' }}
+            />
+            {pwdMsg && (
+              <div style={{ fontSize: '13px', color: pwdMsg.includes('成功') ? '#10b981' : '#ef4444', marginBottom: '12px' }}>
+                {pwdMsg}
+              </div>
+            )}
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button
+                onClick={() => { setShowPwdModal(false); setOldPwd(''); setNewPwd(''); setConfirmPwd(''); setPwdMsg(''); }}
+                style={{ flex: 1, padding: '10px', border: '1px solid #ddd', borderRadius: '8px', background: '#fff', fontSize: '14px', cursor: 'pointer' }}
+              >
+                取消
+              </button>
+              <button
+                onClick={handleChangePassword}
+                style={{ flex: 1, padding: '10px', border: 'none', borderRadius: '8px', background: '#4f46e5', color: '#fff', fontSize: '14px', cursor: 'pointer' }}
+              >
+                确认修改
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
