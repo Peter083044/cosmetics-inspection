@@ -10,6 +10,9 @@ interface BeforeInstallPromptEvent extends Event {
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
 }
 
+const DISMISSED_KEY = 'install-prompt-dismissed-at';
+const DISMISS_DURATION_HOURS = 24; // 24小时内不再提示
+
 export function InstallPrompt() {
   const [deferredPrompt, setDeferredPrompt] =
     useState<BeforeInstallPromptEvent | null>(null);
@@ -18,18 +21,38 @@ export function InstallPrompt() {
   const [isIOS, setIsIOS] = useState(false);
   const [showIOSGuide, setShowIOSGuide] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
     // Check if already installed
     if (window.matchMedia('(display-mode: standalone)').matches) {
       setIsInstalled(true);
+      setIsReady(true);
       return;
     }
 
     // Check if running as PWA (iOS)
     if ((navigator as any).standalone === true) {
       setIsInstalled(true);
+      setIsReady(true);
       return;
+    }
+
+    // Check if user previously dismissed the prompt
+    try {
+      const dismissedAt = localStorage.getItem(DISMISSED_KEY);
+      if (dismissedAt) {
+        const dismissedTime = parseInt(dismissedAt, 10);
+        const hoursSinceDismissed = (Date.now() - dismissedTime) / (1000 * 60 * 60);
+        if (hoursSinceDismissed < DISMISS_DURATION_HOURS) {
+          // User dismissed recently, don't show prompt
+          setIsReady(true);
+          return;
+        }
+      }
+    } catch (e) {
+      // localStorage not available
+      console.warn('localStorage not available:', e);
     }
 
     // Detect mobile
@@ -49,18 +72,33 @@ export function InstallPrompt() {
 
     window.addEventListener('beforeinstallprompt', handler);
 
-    // Show prompt on mobile after 2 seconds if not previously dismissed
-    const dismissedTime = localStorage.getItem('install-prompt-dismissed');
-    if (!dismissedTime || (Date.now() - parseInt(dismissedTime)) / (1000 * 60 * 60) >= 24) {
-      if (mobile) {
-        setTimeout(() => setShowPrompt(true), 2000);
-      }
+    // Show prompt on mobile after 2 seconds
+    if (mobile) {
+      const timer = setTimeout(() => setShowPrompt(true), 2000);
+      setIsReady(true);
+      return () => {
+        clearTimeout(timer);
+        window.removeEventListener('beforeinstallprompt', handler);
+      };
     }
+
+    setIsReady(true);
 
     return () => {
       window.removeEventListener('beforeinstallprompt', handler);
     };
   }, []);
+
+  const handleDismiss = () => {
+    setShowPrompt(false);
+    setShowIOSGuide(false);
+    try {
+      localStorage.setItem(DISMISSED_KEY, Date.now().toString());
+    } catch (e) {
+      // localStorage not available
+      console.warn('Failed to save dismiss state:', e);
+    }
+  };
 
   const handleInstall = async () => {
     // Case 1: Android/Chrome with beforeinstallprompt support
@@ -83,14 +121,12 @@ export function InstallPrompt() {
 
     // Case 3: Fallback - redirect to install guide page
     // This covers: WeChat browser, other browsers without PWA support
+    handleDismiss(); // Dismiss the prompt before redirecting
     window.location.href = '/install';
   };
 
-  const handleDismiss = () => {
-    setShowPrompt(false);
-    setShowIOSGuide(false);
-    localStorage.setItem('install-prompt-dismissed', Date.now().toString());
-  };
+  // Don't render anything until we've checked localStorage and installation status
+  if (!isReady) return null;
 
   if (isInstalled) return null;
 
@@ -125,7 +161,7 @@ export function InstallPrompt() {
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={() => { window.location.href = '/install'; }}
+                    onClick={() => { handleDismiss(); window.location.href = '/install'; }}
                     className="text-blue-600 border-blue-200 text-xs"
                   >
                     安装指南
