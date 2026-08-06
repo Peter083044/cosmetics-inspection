@@ -150,7 +150,6 @@ export default function InspectionDetailPage({ params }: { params: Promise<{ id:
       const data = await res.json();
       if (data.success) {
         setAvailableReviewers(data.data || []);
-        setShowReviewerSelect(true);
       }
     } catch {
       // ignore
@@ -190,14 +189,17 @@ export default function InspectionDetailPage({ params }: { params: Promise<{ id:
 
   // 打开审核人选择
   const openReviewerSelect = async () => {
+    if (!inspection) return;
     const nextRole = getNextReviewRole();
     if (!nextRole) {
       alert('无法确定下一级审核人');
       return;
     }
     setNextRoleLabel(ROLE_LABELS[nextRole] || nextRole);
-    setShowReviewerSelect(true);
+    // 先获取审核人列表
     await fetchAvailableReviewers(nextRole);
+    // 然后显示弹窗
+    setShowReviewerSelect(true);
   };
 
   // 确认选择审核人并提交
