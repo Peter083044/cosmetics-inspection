@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { PWARegister } from "@/components/pwa-register";
+import { InstallPrompt } from "@/components/install-prompt";
 
 interface User {
   id: number;
@@ -96,7 +98,10 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <>
+      <PWARegister />
+      <InstallPrompt />
+      <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <header className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
@@ -245,5 +250,6 @@ export default function DashboardPage() {
         )}
       </main>
     </div>
+    </>
   );
 }
