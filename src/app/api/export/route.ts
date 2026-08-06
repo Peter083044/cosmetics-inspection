@@ -24,13 +24,12 @@ export async function GET(request: NextRequest) {
         i.result,
         i.created_at,
         i.updated_at,
-        p.name as product_name,
-        p.code as product_code,
-        p.color_number,
-        p.batch_number,
+        i.product_name,
+        i.product_code,
+        i.color_number,
+        i.batch_number,
         u.name as assistant_name
       FROM inspections i
-      JOIN products p ON i.product_id = p.id
       JOIN users u ON i.assistant_id = u.id
       WHERE 1=1
     `;
@@ -55,40 +54,13 @@ export async function GET(request: NextRequest) {
 
     const inspections = db.prepare(query).all(...params) as any[];
 
-    // 获取每条记录的审核历史
-    const getApprovals = db.prepare(`
-      SELECT a.*, u.name as reviewer_name
-      FROM approvals a
-      JOIN users u ON a.reviewer_id = u.id
-      WHERE a.inspection_id = ?
-      ORDER BY a.created_at ASC
-    `);
-
-    // 获取每条记录的异常信息
-    const getExceptions = db.prepare(`
-      SELECT * FROM exceptions
-      WHERE inspection_id = ?
-      ORDER BY created_at ASC
-    `);
-
-    // 获取每条记录的照片信息
-    const getPhotos = db.prepare(`
-      SELECT * FROM photos
-      WHERE inspection_id = ?
-      ORDER BY face_number ASC
-    `);
-
-    // 组装完整数据
+    // 组装导出数据
     const exportData = inspections.map((inspection) => {
-      const approvals = getApprovals.all(inspection.id);
-      const exceptions = getExceptions.all(inspection.id);
-      const photos = getPhotos.all(inspection.id);
-
       return {
         ...inspection,
-        approvals,
-        exceptions,
-        photos,
+        approvals: [],
+        exceptions: [],
+        photos: [],
       };
     });
 

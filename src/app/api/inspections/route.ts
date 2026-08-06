@@ -13,16 +13,33 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url);
+    const id = searchParams.get('id');
     const status = searchParams.get('status');
     const page = parseInt(searchParams.get('page') || '1');
     const pageSize = parseInt(searchParams.get('pageSize') || '20');
 
+    // 获取单条检验记录详情
+    if (id) {
+      const inspection = db.prepare(`
+        SELECT i.*, u.name as assistant_name
+        FROM inspections i
+        JOIN users u ON i.assistant_id = u.id
+        WHERE i.id = ?
+      `).get(id);
+
+      if (!inspection) {
+        return NextResponse.json({ error: '检验记录不存在' }, { status: 404 });
+      }
+
+      return NextResponse.json({
+        success: true,
+        data: inspection,
+      });
+    }
+
     let query = `
-      SELECT i.*, p.name as product_name, p.code as product_code, 
-             p.color_number, p.batch_number,
-             u.name as assistant_name
+      SELECT i.*, u.name as assistant_name
       FROM inspections i
-      JOIN products p ON i.product_id = p.id
       JOIN users u ON i.assistant_id = u.id
       WHERE 1=1
     `;
@@ -81,63 +98,35 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { product_id, photos, result, comparison_details } = await request.json();
+    const { product_name, product_code, color_number, batch_number, comparisons, result, result_summary } = await request.json();
 
-    if (!product_id) {
+    if (!product_name || !product_code) {
       return NextResponse.json(
-        { error: '产品信息不能为空' },
+        { error: '产品名称和代码不能为空' },
         { status: 400 }
       );
     }
 
     // 创建检验记录
     const insertInspection = db.prepare(`
-      INSERT INTO inspections (product_id, assistant_id, status, result, comparison_details)
-      VALUES (?, ?, ?, ?, ?)
+      INSERT INTO inspections (product_name, product_code, color_number, batch_number, comparisons, result, result_summary, assistant_id, assistant_name, status)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     const inspectionResult = insertInspection.run(
-      product_id,
-      user.id,
-      'line_leader_review',
+      product_name,
+      product_code,
+      color_number || null,
+      batch_number || null,
+      comparisons ? JSON.stringify(comparisons) : null,
       result || null,
-      comparison_details ? JSON.stringify(comparison_details) : null
+      result_summary || null,
+      user.id,
+      user.name || user.username,
+      'line_leader_review'
     );
 
     const inspectionId = inspectionResult.lastInsertRowid;
-
-    // 保存照片信息
-    if (photos && Array.isArray(photos)) {
-      const insertPhoto = db.prepare(`
-        INSERT INTO photos (inspection_id, face_number, standard_photo, actual_photo, comparison_result, notes)
-        VALUES (?, ?, ?, ?, ?, ?)
-      `);
-
-      for (const photo of photos) {
-        insertPhoto.run(
-          inspectionId,
-          photo.face_number,
-          photo.standard_photo,
-          photo.actual_photo,
-          photo.comparison_result || null,
-          photo.notes || null
-        );
-      }
-    }
-
-    // 记录审核日志
-    const insertApproval = db.prepare(`
-      INSERT INTO approvals (inspection_id, reviewer_id, reviewer_role, action, comments)
-      VALUES (?, ?, ?, ?, ?)
-    `);
-
-    insertApproval.run(
-      inspectionId,
-      user.id,
-      user.role,
-      'approved',
-      '辅助提交检验记录'
-    );
 
     return NextResponse.json({
       success: true,

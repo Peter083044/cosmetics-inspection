@@ -76,6 +76,19 @@ export function initDatabase() {
     )
   `);
 
+  // 审核记录表
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS approvals (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      inspection_id INTEGER NOT NULL REFERENCES inspections(id) ON DELETE CASCADE,
+      reviewer_id INTEGER NOT NULL REFERENCES users(id),
+      reviewer_role TEXT NOT NULL,
+      action TEXT NOT NULL CHECK(action IN ('approved', 'rejected')),
+      comments TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
   // 插入默认用户（如果不存在）
   const userCount = db.prepare('SELECT COUNT(*) as count FROM users').get() as any;
   if (userCount.count === 0) {
