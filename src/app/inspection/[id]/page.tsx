@@ -424,7 +424,8 @@ export default function InspectionDetailPage({ params }: { params: Promise<{ id:
         <div className="title" style={{ flex: 1 }}>检验详情</div>
         <span className={`status-badge ${
           inspection.status === 'approved' ? 'status-approved' :
-          inspection.status === 'rejected' ? 'status-rejected' : 'status-pending'
+          inspection.status === 'rejected' ? 'status-rejected' :
+          inspection.status === 'draft' ? 'status-draft' : 'status-pending'
         }`}>
           {STATUS_LABELS[inspection.status] || inspection.status}
         </span>

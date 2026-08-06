@@ -31,14 +31,15 @@ function getNextStatus(levels: string[], currentRole: string): string {
 // 根据审核链路确定退回目标
 function getReturnTarget(levels: string[], currentRole: string): { status: string; back_to: string } | null {
   const currentIndex = levels.indexOf(currentRole);
-  if (currentIndex <= 0) {
-    return null; // 已是第一级，无法退回
-  }
-  const prevRole = levels[currentIndex - 1];
-  if (prevRole === 'line_leader') {
+  if (currentIndex === -1) return null;
+  
+  if (currentIndex === 0) {
+    // 第一级审核退回到辅助人员
     return { status: 'draft', back_to: 'assistant' };
   }
+  
   // 退回到上一审核级别
+  const prevRole = levels[currentIndex - 1];
   return { status: `${prevRole}_review`, back_to: prevRole };
 }
 
