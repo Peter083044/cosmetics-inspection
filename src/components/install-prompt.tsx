@@ -63,6 +63,7 @@ export function InstallPrompt() {
   }, []);
 
   const handleInstall = async () => {
+    // Case 1: Android/Chrome with beforeinstallprompt support
     if (deferredPrompt) {
       deferredPrompt.prompt();
       const { outcome } = await deferredPrompt.userChoice;
@@ -71,9 +72,18 @@ export function InstallPrompt() {
       }
       setDeferredPrompt(null);
       setShowPrompt(false);
-    } else if (isIOS) {
-      setShowIOSGuide(true);
+      return;
     }
+
+    // Case 2: iOS Safari - show manual guide
+    if (isIOS) {
+      setShowIOSGuide(true);
+      return;
+    }
+
+    // Case 3: Fallback - redirect to install guide page
+    // This covers: WeChat browser, other browsers without PWA support
+    window.location.href = '/install';
   };
 
   const handleDismiss = () => {
