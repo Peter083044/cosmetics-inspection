@@ -189,7 +189,9 @@ export default function InspectionDetailPage({ params }: { params: Promise<{ id:
       alert('无法确定下一级审核人');
       return;
     }
+    setNextRoleLabel(ROLE_LABELS[nextRole] || nextRole);
     fetchAvailableReviewers(nextRole);
+    setShowReviewerSelect(true);
   };
 
   // 确认选择审核人并提交

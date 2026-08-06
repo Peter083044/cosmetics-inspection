@@ -4,23 +4,41 @@ import db, { initDatabase } from '@/lib/db';
 
 initDatabase();
 
-// GET /api/users - 获取用户列表（仅管理员）
-export async function GET() {
+// GET /api/users - 获取用户列表
+// 管理员：获取所有用户
+// 普通用户：可通过 ?role=xxx 获取指定角色的用户列表（用于选择审核人）
+export async function GET(request: NextRequest) {
   try {
     const user = await getCurrentUser();
     if (!user) {
       return NextResponse.json({ error: '未登录' }, { status: 401 });
     }
 
-    if (user.role !== 'admin') {
+    const { searchParams } = new URL(request.url);
+    const roleFilter = searchParams.get('role');
+
+    // 如果没有指定角色过滤，则只有管理员可以获取所有用户
+    if (!roleFilter && user.role !== 'admin') {
       return NextResponse.json({ error: '无权限' }, { status: 403 });
     }
 
-    const users = db.prepare(`
-      SELECT id, username, name, role, created_at 
-      FROM users 
-      ORDER BY created_at DESC
-    `).all();
+    let users;
+    if (roleFilter) {
+      // 按角色过滤（所有登录用户都可以）
+      users = db.prepare(`
+        SELECT id, username, name, role, created_at 
+        FROM users 
+        WHERE role = ?
+        ORDER BY name ASC
+      `).all(roleFilter);
+    } else {
+      // 管理员获取所有用户
+      users = db.prepare(`
+        SELECT id, username, name, role, created_at 
+        FROM users 
+        ORDER BY created_at DESC
+      `).all();
+    }
 
     return NextResponse.json({
       success: true,
