@@ -107,7 +107,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { inspection_date, product_name, product_code, color_number, batch_number, work_order_image, instruction_order_image, comparisons, result, result_summary, submit_explanation } = await request.json();
+    const { inspection_date, product_name, product_code, color_number, batch_number, work_order_image, instruction_order_image, comparisons, result, result_summary, submit_explanation, label_standard, label_actual, label_result, label_difference } = await request.json();
 
     if (!product_name || !product_code) {
       return NextResponse.json(
@@ -116,9 +116,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 通过率不足100%时，必须填写提交说明
+    // 通过率不足100%时，必须填写提交说明（包含标签核对）
     const activeComparisons = comparisons ? comparisons.filter((c: any) => c.standard || c.actual) : [];
-    const hasFail = activeComparisons.some((c: any) => c.result === 'fail');
+    const hasLabel = label_standard || label_actual;
+    const hasFail = activeComparisons.some((c: any) => c.result === 'fail') || (label_result === 'fail' && hasLabel);
     if (hasFail && !submit_explanation?.trim() && !result_summary?.trim()) {
       return NextResponse.json(
         { error: '通过率不足100%，必须填写提交说明原因' },
@@ -130,8 +131,8 @@ export async function POST(request: NextRequest) {
 
     // 创建检验记录
     const insertInspection = db.prepare(`
-      INSERT INTO inspections (inspection_date, product_name, product_code, color_number, batch_number, work_order_image, comparisons, result, result_summary, submit_explanation, assistant_id, assistant_name, status)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO inspections (inspection_date, product_name, product_code, color_number, batch_number, work_order_image, comparisons, result, result_summary, submit_explanation, label_standard, label_actual, label_result, label_difference, assistant_id, assistant_name, status)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     const inspectionResult = insertInspection.run(
@@ -145,6 +146,10 @@ export async function POST(request: NextRequest) {
       result || null,
       result_summary || null,
       submit_explanation || result_summary || null,
+      label_standard || null,
+      label_actual || null,
+      hasLabel ? (label_result || 'pass') : null,
+      label_result === 'fail' ? (label_difference || null) : null,
       user.id,
       user.name || user.username,
       'line_leader_review'

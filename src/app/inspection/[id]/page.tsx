@@ -20,6 +20,10 @@ interface Inspection {
     result: string;
     difference: string;
   }>;
+  label_standard?: string;
+  label_actual?: string;
+  label_result?: string;
+  label_difference?: string;
   result: string;
   result_summary: string;
   submit_explanation: string;
@@ -145,13 +149,15 @@ export default function InspectionDetailPage({ params }: { params: Promise<{ id:
     }
   };
 
-  // 计算通过率
+  // 计算通过率（包含标签核对）
   const getPassRate = (): number => {
-    if (!inspection?.comparisons || inspection.comparisons.length === 0) return 100;
-    const activeComps = inspection.comparisons.filter(c => c.standard || c.actual);
-    if (activeComps.length === 0) return 100;
-    const passCount = activeComps.filter(c => c.result === 'pass').length;
-    return Math.round((passCount / activeComps.length) * 100);
+    if (!inspection) return 100;
+    const activeComps = (inspection.comparisons || []).filter(c => c.standard || c.actual);
+    const hasLabel = inspection.label_standard || inspection.label_actual;
+    const totalItems = activeComps.length + (hasLabel ? 1 : 0);
+    if (totalItems === 0) return 100;
+    const passCount = activeComps.filter(c => c.result === 'pass').length + (hasLabel && inspection.label_result === 'pass' ? 1 : 0);
+    return Math.round((passCount / totalItems) * 100);
   };
 
   // 提交审核（需要检查通过率）
@@ -351,6 +357,43 @@ export default function InspectionDetailPage({ params }: { params: Promise<{ id:
           </div>
         ))}
       </div>
+
+      {/* Label Comparison */}
+      {(inspection.label_standard || inspection.label_actual) && (
+        <div className="section">
+          <div className="section-title">🏷️ 标签核对</div>
+          <div className="card">
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+              <div>
+                <div style={{ fontSize: '12px', color: '#666', marginBottom: '6px', fontWeight: '500' }}>标样标签</div>
+                {inspection.label_standard ? (
+                  <img src={inspection.label_standard} alt="标样标签" style={{ width: '100%', borderRadius: '8px' }} />
+                ) : (
+                  <div style={{ width: '100%', aspectRatio: '1', background: '#f5f5f5', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#999', fontSize: '12px' }}>未上传</div>
+                )}
+              </div>
+              <div>
+                <div style={{ fontSize: '12px', color: '#666', marginBottom: '6px', fontWeight: '500' }}>首件标签</div>
+                {inspection.label_actual ? (
+                  <img src={inspection.label_actual} alt="首件标签" style={{ width: '100%', borderRadius: '8px' }} />
+                ) : (
+                  <div style={{ width: '100%', aspectRatio: '1', background: '#f5f5f5', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#999', fontSize: '12px' }}>未上传</div>
+                )}
+              </div>
+            </div>
+            {inspection.label_result && (
+              <div style={{ marginTop: '8px', display: 'inline-block', padding: '2px 8px', borderRadius: '4px', fontSize: '12px', background: inspection.label_result === 'pass' ? '#e8f5e9' : '#ffebee', color: inspection.label_result === 'pass' ? '#2e7d32' : '#d32f2f' }}>
+                标签核对：{inspection.label_result === 'pass' ? '通过' : '不通过'}
+              </div>
+            )}
+            {inspection.label_difference && (
+              <div style={{ marginTop: '8px', padding: '8px', background: '#ffebee', borderRadius: '6px', fontSize: '12px', color: '#d32f2f' }}>
+                <strong>差异说明：</strong>{inspection.label_difference}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Section 3: Result */}
       <div className="section">

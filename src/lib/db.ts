@@ -91,6 +91,27 @@ export function initDatabase() {
   } catch {
     // 字段已存在，忽略
   }
+  // 标签核对字段
+  try {
+    db.exec(`ALTER TABLE inspections ADD COLUMN label_standard TEXT`);
+  } catch {
+    // 字段已存在，忽略
+  }
+  try {
+    db.exec(`ALTER TABLE inspections ADD COLUMN label_actual TEXT`);
+  } catch {
+    // 字段已存在，忽略
+  }
+  try {
+    db.exec(`ALTER TABLE inspections ADD COLUMN label_result TEXT DEFAULT 'pass'`);
+  } catch {
+    // 字段已存在，忽略
+  }
+  try {
+    db.exec(`ALTER TABLE inspections ADD COLUMN label_difference TEXT`);
+  } catch {
+    // 字段已存在，忽略
+  }
 
   // 审核记录表
   db.exec(`
