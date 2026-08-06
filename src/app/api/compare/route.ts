@@ -1,6 +1,50 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { LLMClient, Config, HeaderUtils } from 'coze-coding-dev-sdk';
 import { getCurrentUser } from '@/lib/auth';
+import sharp from 'sharp';
+import path from 'path';
+import fs from 'fs';
+
+// Max pixels for the vision model (6000x6000 = 36M pixels)
+const MAX_PIXELS = 36_000_000;
+
+async function resizeImageToBase64(imageUrl: string): Promise<string> {
+  let imageBuffer: Buffer;
+
+  if (imageUrl.startsWith('http')) {
+    // Download remote image
+    const res = await fetch(imageUrl);
+    if (!res.ok) throw new Error(`Failed to fetch image: ${res.status}`);
+    const arrayBuffer = await res.arrayBuffer();
+    imageBuffer = Buffer.from(arrayBuffer);
+  } else {
+    // Local file
+    const filePath = path.join(process.env.COZE_WORKSPACE_PATH || '/workspace/projects', 'public', imageUrl);
+    imageBuffer = fs.readFileSync(filePath);
+  }
+
+  // Get image metadata
+  const metadata = await sharp(imageBuffer).metadata();
+  const width = metadata.width || 1;
+  const height = metadata.height || 1;
+  const totalPixels = width * height;
+
+  // Resize if exceeds max pixels
+  if (totalPixels > MAX_PIXELS) {
+    const scale = Math.sqrt(MAX_PIXELS / totalPixels);
+    const newWidth = Math.floor(width * scale);
+    const newHeight = Math.floor(height * scale);
+    imageBuffer = await sharp(imageBuffer)
+      .resize(newWidth, newHeight, { fit: 'inside' })
+      .jpeg({ quality: 85 })
+      .toBuffer();
+  }
+
+  // Convert to base64 data URL
+  const base64 = imageBuffer.toString('base64');
+  const mimeType = 'image/jpeg';
+  return `data:${mimeType};base64,${base64}`;
+}
 
 export async function POST(request: NextRequest) {
   const user = await getCurrentUser();
@@ -18,15 +62,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Resize images and convert to base64 to avoid pixel limit issues
+    const [standardBase64, actualBase64] = await Promise.all([
+      resizeImageToBase64(standard_url),
+      resizeImageToBase64(actual_url),
+    ]);
+
     const customHeaders = HeaderUtils.extractForwardHeaders(request.headers);
     const config = new Config();
     const client = new LLMClient(config, customHeaders);
-
-    // Build image URLs - use absolute URLs for the vision model
-    const baseUrl = process.env.COZE_PROJECT_DOMAIN_DEFAULT || 'localhost:5000';
-    const protocol = baseUrl.startsWith('http') ? '' : 'https://';
-    const standardFullUrl = standard_url.startsWith('http') ? standard_url : `${protocol}${baseUrl}${standard_url}`;
-    const actualFullUrl = actual_url.startsWith('http') ? actual_url : `${protocol}${baseUrl}${actual_url}`;
 
     const systemPrompt = `你是一个化妆品生产过程的首件核对专家。你的任务是对比标样图片和首件实物图片，判断它们是否一致。
 
@@ -53,15 +97,15 @@ export async function POST(request: NextRequest) {
           {
             type: 'image_url',
             image_url: {
-              url: standardFullUrl,
-              detail: 'high',
+              url: standardBase64,
+              detail: 'low',
             },
           },
           {
             type: 'image_url',
             image_url: {
-              url: actualFullUrl,
-              detail: 'high',
+              url: actualBase64,
+              detail: 'low',
             },
           },
         ],
@@ -103,13 +147,12 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      result: result.result,
-      difference: result.difference,
+      ...result,
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Image comparison error:', error);
     return NextResponse.json(
-      { error: '图片比对失败，请重试' },
+      { error: `图片比对失败: ${error.message || '请重试'}` },
       { status: 500 }
     );
   }
