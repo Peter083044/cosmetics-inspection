@@ -164,3 +164,8 @@ Desktop.ini
 # Misc
 .coze-logs
 .codegraph/
+
+# Project data (not for version control)
+assets/
+public/uploads/
+data/
