@@ -67,6 +67,10 @@ export default function NewInspectionPage() {
     LABEL_ITEMS.map((l, i) => ({ index: l.id, name: l.name, standard: '', actual: '', result: 'pass', difference: '' }))
   );
 
+  // Auto-comparing states
+  const [comparingSides, setComparingSides] = useState<Set<number>>(new Set());
+  const [comparingLabels, setComparingLabels] = useState<Set<number>>(new Set());
+
   const [resultSummary, setResultSummary] = useState('');
 
   useEffect(() => {
@@ -82,6 +86,64 @@ export default function NewInspectionPage() {
       })
       .catch(() => router.push('/login'));
   }, []);
+
+  // Auto-compare function for photo comparisons
+  const autoComparePhoto = async (sideIndex: number, standard: string, actual: string, sideName: string) => {
+    if (!standard || !actual) return;
+    setComparingSides(prev => new Set(prev).add(sideIndex));
+    try {
+      const res = await fetch('/api/compare', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ standard_url: standard, actual_url: actual, side_name: sideName }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setComparisons(prev => {
+          const next = [...prev];
+          next[sideIndex] = { ...next[sideIndex], result: data.result, difference: data.difference };
+          return next;
+        });
+      }
+    } catch {
+      // Silently fail - user can still manually set result
+    } finally {
+      setComparingSides(prev => {
+        const next = new Set(prev);
+        next.delete(sideIndex);
+        return next;
+      });
+    }
+  };
+
+  // Auto-compare function for label comparisons
+  const autoCompareLabel = async (labelIndex: number, standard: string, actual: string, labelName: string) => {
+    if (!standard || !actual) return;
+    setComparingLabels(prev => new Set(prev).add(labelIndex));
+    try {
+      const res = await fetch('/api/compare', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ standard_url: standard, actual_url: actual, side_name: labelName }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setLabelComparisons(prev => {
+          const next = [...prev];
+          next[labelIndex] = { ...next[labelIndex], result: data.result, difference: data.difference };
+          return next;
+        });
+      }
+    } catch {
+      // Silently fail
+    } finally {
+      setComparingLabels(prev => {
+        const next = new Set(prev);
+        next.delete(labelIndex);
+        return next;
+      });
+    }
+  };
 
   const handlePhotoUpload = (sideIndex: number, type: 'standard' | 'actual') => {
     const input = document.createElement('input');
@@ -101,6 +163,11 @@ export default function NewInspectionPage() {
           setComparisons(prev => {
             const next = [...prev];
             next[sideIndex] = { ...next[sideIndex], [type]: data.url };
+            // Trigger auto-compare if both photos are uploaded
+            const updated = next[sideIndex];
+            if (updated.standard && updated.actual) {
+              setTimeout(() => autoComparePhoto(sideIndex, updated.standard, updated.actual, updated.side_name), 100);
+            }
             return next;
           });
         }
@@ -150,9 +217,17 @@ export default function NewInspectionPage() {
         const res = await fetch('/api/upload', { method: 'POST', body: formData });
         const data = await res.json();
         if (data.success) {
-          setLabelComparisons(prev => prev.map((lc, i) =>
-            i === labelIndex ? { ...lc, [type]: data.url } : lc
-          ));
+          setLabelComparisons(prev => {
+            const next = prev.map((lc, i) =>
+              i === labelIndex ? { ...lc, [type]: data.url } : lc
+            );
+            // Trigger auto-compare if both photos are uploaded
+            const updated = next[labelIndex];
+            if (updated.standard && updated.actual) {
+              setTimeout(() => autoCompareLabel(labelIndex, updated.standard, updated.actual, updated.name), 100);
+            }
+            return next;
+          });
         }
       } catch {
         alert('上传失败');
@@ -331,7 +406,14 @@ export default function NewInspectionPage() {
               </div>
             </div>
 
-            {comp.result === 'fail' && (
+            {comparingSides.has(idx) && (
+              <div style={{ marginTop: '8px', padding: '8px', background: '#e3f2fd', borderRadius: '8px', textAlign: 'center', fontSize: '12px', color: '#1565c0' }}>
+                <span style={{ display: 'inline-block', animation: 'spin 1s linear infinite', marginRight: '6px' }}>🔄</span>
+                AI 自动比对中...
+              </div>
+            )}
+
+            {comp.result === 'fail' && !comparingSides.has(idx) && (
               <div style={{ marginTop: '8px' }}>
                 <label style={{ display: 'block', fontSize: '11px', color: '#d32f2f', marginBottom: '4px' }}>差异说明 *</label>
                 <textarea
@@ -402,7 +484,14 @@ export default function NewInspectionPage() {
               </div>
             </div>
 
-            {lc.result === 'fail' && (
+            {comparingLabels.has(idx) && (
+              <div style={{ marginTop: '8px', padding: '8px', background: '#e3f2fd', borderRadius: '8px', textAlign: 'center', fontSize: '12px', color: '#1565c0' }}>
+                <span style={{ display: 'inline-block', animation: 'spin 1s linear infinite', marginRight: '6px' }}>🔄</span>
+                AI 自动比对中...
+              </div>
+            )}
+
+            {lc.result === 'fail' && !comparingLabels.has(idx) && (
               <div style={{ marginTop: '8px' }}>
                 <label style={{ display: 'block', fontSize: '11px', color: '#d32f2f', marginBottom: '4px' }}>{lc.name}差异说明 *</label>
                 <textarea
