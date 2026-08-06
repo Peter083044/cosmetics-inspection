@@ -1,5 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import { Inspector } from 'react-dev-inspector';
+import { PWARegister } from '@/components/pwa-register';
+import { InstallPrompt } from '@/components/install-prompt';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -44,6 +46,8 @@ export default function RootLayout({
   return (
     <html lang="zh-CN">
       <body className={`antialiased`}>
+        <PWARegister />
+        <InstallPrompt />
         {isDev && <Inspector />}
         {children}
       </body>
