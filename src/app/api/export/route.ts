@@ -24,10 +24,12 @@ export async function GET(request: NextRequest) {
         i.result,
         i.created_at,
         i.updated_at,
+        i.inspection_date,
         i.product_name,
         i.product_code,
         i.color_number,
         i.batch_number,
+        i.work_order_image,
         u.name as assistant_name
       FROM inspections i
       JOIN users u ON i.assistant_id = u.id
@@ -85,10 +87,12 @@ export async function GET(request: NextRequest) {
 function generateCSV(data: any[]): string {
   const headers = [
     '检验ID',
+    '检验日期',
     '产品名称',
     '产品代码',
     '色号',
     '批号',
+    '工单图片',
     '辅助人员',
     '检验结果',
     '状态',
@@ -123,10 +127,12 @@ function generateCSV(data: any[]): string {
 
     return [
       item.id,
+      item.inspection_date || item.created_at.split(' ')[0],
       item.product_name,
       item.product_code,
       item.color_number,
       item.batch_number || '',
+      item.work_order_image || '',
       item.assistant_name,
       resultMap[item.result] || item.result || '',
       statusMap[item.status] || item.status,

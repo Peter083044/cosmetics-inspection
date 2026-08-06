@@ -46,10 +46,12 @@ export function initDatabase() {
   db.exec(`
     CREATE TABLE IF NOT EXISTS inspections (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
+      inspection_date TEXT,
       product_name TEXT NOT NULL,
       product_code TEXT NOT NULL,
       color_number TEXT NOT NULL,
       batch_number TEXT,
+      work_order_image TEXT,
       assistant_id INTEGER NOT NULL REFERENCES users(id),
       assistant_name TEXT NOT NULL,
       status TEXT NOT NULL DEFAULT 'line_leader_review',

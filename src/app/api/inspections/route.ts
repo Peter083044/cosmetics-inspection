@@ -98,7 +98,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { product_name, product_code, color_number, batch_number, comparisons, result, result_summary } = await request.json();
+    const { inspection_date, product_name, product_code, color_number, batch_number, work_order_image, comparisons, result, result_summary } = await request.json();
 
     if (!product_name || !product_code) {
       return NextResponse.json(
@@ -109,15 +109,17 @@ export async function POST(request: NextRequest) {
 
     // 创建检验记录
     const insertInspection = db.prepare(`
-      INSERT INTO inspections (product_name, product_code, color_number, batch_number, comparisons, result, result_summary, assistant_id, assistant_name, status)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO inspections (inspection_date, product_name, product_code, color_number, batch_number, work_order_image, comparisons, result, result_summary, assistant_id, assistant_name, status)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     const inspectionResult = insertInspection.run(
+      inspection_date || new Date().toISOString().split('T')[0],
       product_name,
       product_code,
       color_number || null,
       batch_number || null,
+      work_order_image || null,
       comparisons ? JSON.stringify(comparisons) : null,
       result || null,
       result_summary || null,

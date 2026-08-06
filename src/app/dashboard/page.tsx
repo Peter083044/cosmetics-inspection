@@ -209,10 +209,10 @@ export default function DashboardPage() {
               <thead className="bg-gray-50 border-b">
                 <tr>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">ID</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">日期</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">产品信息</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">辅助人员</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">状态</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">创建时间</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">操作</th>
                 </tr>
               </thead>
@@ -220,6 +220,9 @@ export default function DashboardPage() {
                 {inspections.map((inspection) => (
                   <tr key={inspection.id} className="hover:bg-gray-50">
                     <td className="px-4 py-3 text-sm">#{inspection.id}</td>
+                    <td className="px-4 py-3 text-sm text-gray-500">
+                      {inspection.inspection_date ? new Date(inspection.inspection_date).toLocaleDateString("zh-CN") : "-"}
+                    </td>
                     <td className="px-4 py-3">
                       <div>
                         <p className="text-sm font-medium">{inspection.product_name}</p>
@@ -233,9 +236,6 @@ export default function DashboardPage() {
                       <Badge className={STATUS_COLORS[inspection.status]}>
                         {STATUS_NAMES[inspection.status]}
                       </Badge>
-                    </td>
-                    <td className="px-4 py-3 text-sm text-gray-500">
-                      {new Date(inspection.created_at).toLocaleString("zh-CN")}
                     </td>
                     <td className="px-4 py-3">
                       <Button variant="outline" size="sm" onClick={() => handleViewInspection(inspection.id)}>

@@ -34,10 +34,12 @@ export default function NewInspectionPage() {
   const [submitting, setSubmitting] = useState(false);
 
   // Product info
+  const [inspectionDate, setInspectionDate] = useState(new Date().toISOString().split("T")[0]);
   const [productName, setProductName] = useState("");
   const [productCode, setProductCode] = useState("");
   const [colorNumber, setColorNumber] = useState("");
   const [batchNumber, setBatchNumber] = useState("");
+  const [workOrderImage, setWorkOrderImage] = useState<string | null>(null);
 
   // Photo comparisons (up to 6 sides)
   const [comparisons, setComparisons] = useState<PhotoComparison[]>(
@@ -97,6 +99,29 @@ export default function NewInspectionPage() {
       });
     } catch (error) {
       alert("上传失败，请重试");
+    }
+  };
+
+  const handleWorkOrderUpload = async (file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("type", "work_order");
+
+    try {
+      const res = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!res.ok) {
+        alert("上传失败");
+        return;
+      }
+
+      const data = await res.json();
+      setWorkOrderImage(data.url);
+    } catch {
+      alert("上传失败");
     }
   };
 
@@ -167,10 +192,12 @@ export default function NewInspectionPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          inspection_date: inspectionDate,
           product_name: productName,
           product_code: productCode,
           color_number: colorNumber,
           batch_number: batchNumber,
+          work_order_image: workOrderImage,
           comparisons: filledComparisons,
           result,
           result_summary: summary,
@@ -232,6 +259,15 @@ export default function NewInspectionPage() {
           </CardHeader>
           <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
+              <Label htmlFor="date">日期 *</Label>
+              <Input
+                id="date"
+                type="date"
+                value={inspectionDate}
+                onChange={(e) => setInspectionDate(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
               <Label htmlFor="productName">产品名称 *</Label>
               <Input
                 id="productName"
@@ -259,13 +295,42 @@ export default function NewInspectionPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="batchNumber">批号（选填）</Label>
+              <Label htmlFor="batchNumber">批号（选填，不参与比对）</Label>
               <Input
                 id="batchNumber"
                 value={batchNumber}
                 onChange={(e) => setBatchNumber(e.target.value)}
-                placeholder="批号不参与比对"
+                placeholder="批号信息不作为核对依据"
               />
+            </div>
+            <div className="space-y-2 md:col-span-2">
+              <Label>指令单照片（选填）</Label>
+              <div className="flex items-center gap-4">
+                <Input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) handleWorkOrderUpload(file);
+                  }}
+                />
+                {workOrderImage && (
+                  <div className="relative w-20 h-20">
+                    <img
+                      src={workOrderImage}
+                      alt="指令单"
+                      className="w-full h-full object-cover rounded border"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setWorkOrderImage(null)}
+                      className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs"
+                    >
+                      ×
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           </CardContent>
         </Card>
