@@ -87,6 +87,44 @@ export default function NewInspectionPage() {
       .catch(() => router.push('/login'));
   }, []);
 
+  // Compress image before upload using Canvas API
+  const compressImage = (file: File, maxSize = 1920, quality = 0.8): Promise<Blob> => {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          let { width, height } = img;
+          // Resize if exceeds max dimension
+          if (width > maxSize || height > maxSize) {
+            if (width > height) {
+              height = Math.round((height * maxSize) / width);
+              width = maxSize;
+            } else {
+              width = Math.round((width * maxSize) / height);
+              height = maxSize;
+            }
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) { resolve(file); return; }
+          ctx.drawImage(img, 0, 0, width, height);
+          canvas.toBlob(
+            (blob) => { resolve(blob || file); },
+            'image/jpeg',
+            quality
+          );
+        };
+        img.onerror = () => { resolve(file); };
+        img.src = e.target?.result as string;
+      };
+      reader.onerror = () => { resolve(file); };
+      reader.readAsDataURL(file);
+    });
+  };
+
   // Auto-compare function for photo comparisons
   const autoComparePhoto = async (sideIndex: number, standard: string, actual: string, sideName: string) => {
     if (!standard || !actual) return;
@@ -153,10 +191,13 @@ export default function NewInspectionPage() {
       const file = (e.target as HTMLInputElement).files?.[0];
       if (!file) return;
 
-      const formData = new FormData();
-      formData.append('file', file);
-
       try {
+        // Compress image before upload
+        const compressedBlob = await compressImage(file);
+        const compressedFile = new File([compressedBlob], file.name.replace(/\.\w+$/, '.jpg'), { type: 'image/jpeg' });
+        const formData = new FormData();
+        formData.append('file', compressedFile);
+
         const res = await fetch('/api/upload', { method: 'POST', body: formData });
         const data = await res.json();
         if (data.success) {
@@ -186,10 +227,12 @@ export default function NewInspectionPage() {
       const file = (e.target as HTMLInputElement).files?.[0];
       if (!file) return;
 
-      const formData = new FormData();
-      formData.append('file', file);
-
       try {
+        const compressedBlob = await compressImage(file);
+        const compressedFile = new File([compressedBlob], file.name.replace(/\.\w+$/, '.jpg'), { type: 'image/jpeg' });
+        const formData = new FormData();
+        formData.append('file', compressedFile);
+
         const res = await fetch('/api/upload', { method: 'POST', body: formData });
         const data = await res.json();
         if (data.success) {
@@ -210,10 +253,12 @@ export default function NewInspectionPage() {
       const file = (e.target as HTMLInputElement).files?.[0];
       if (!file) return;
 
-      const formData = new FormData();
-      formData.append('file', file);
-
       try {
+        const compressedBlob = await compressImage(file);
+        const compressedFile = new File([compressedBlob], file.name.replace(/\.\w+$/, '.jpg'), { type: 'image/jpeg' });
+        const formData = new FormData();
+        formData.append('file', compressedFile);
+
         const res = await fetch('/api/upload', { method: 'POST', body: formData });
         const data = await res.json();
         if (data.success) {

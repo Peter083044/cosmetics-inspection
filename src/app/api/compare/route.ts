@@ -29,14 +29,15 @@ async function resizeImageToBase64(imageUrl: string): Promise<string> {
   const height = metadata.height || 1;
   const totalPixels = width * height;
 
-  // Resize if exceeds max pixels
-  if (totalPixels > MAX_PIXELS) {
-    const scale = Math.sqrt(MAX_PIXELS / totalPixels);
-    const newWidth = Math.floor(width * scale);
-    const newHeight = Math.floor(height * scale);
+  // Always resize to reasonable size for AI comparison (max 1280px on longest side)
+  // This handles high-res phone/tablet camera photos (often 4000+ pixels)
+  const MAX_DIMENSION = 1280;
+  const needsResize = totalPixels > MAX_PIXELS || width > MAX_DIMENSION || height > MAX_DIMENSION;
+  
+  if (needsResize) {
     imageBuffer = await sharp(imageBuffer)
-      .resize(newWidth, newHeight, { fit: 'inside' })
-      .jpeg({ quality: 85 })
+      .resize(MAX_DIMENSION, MAX_DIMENSION, { fit: 'inside', withoutEnlargement: true })
+      .jpeg({ quality: 80 })
       .toBuffer();
   }
 
