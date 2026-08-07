@@ -199,7 +199,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { inspection_date, product_name, product_code, color_number, batch_number, work_order_image, instruction_order_image, comparisons, result, result_summary, submit_explanation, label_comparisons, review_levels } = await request.json();
+    const { inspection_date, product_name, product_code, color_number, batch_number, work_order_image, instruction_order_image, comparisons, result, result_summary, submit_explanation, label_comparisons, review_levels } = body as any;
 
     if (!product_name || !product_code) {
       return NextResponse.json(
