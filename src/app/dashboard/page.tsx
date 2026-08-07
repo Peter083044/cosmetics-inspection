@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import DashboardStats from '@/components/DashboardStats';
 
 interface Inspection {
   id: number;
@@ -261,6 +262,9 @@ export default function DashboardPage() {
           全部记录
         </div>
       </div>
+
+      {/* 统计图表 */}
+      <DashboardStats />
 
       {/* Action Buttons */}
       <div style={{ padding: '12px', display: 'flex', gap: '8px' }}>

@@ -713,6 +713,19 @@ export default function InspectionDetailPage({ params }: { params: Promise<{ id:
         </div>
       )}
 
+      {/* PDF 导出按钮 */}
+      {inspection && (
+        <div style={{ padding: '0 12px 12px 12px' }}>
+          <button 
+            className="btn-secondary" 
+            onClick={() => window.open(`/api/pdf?id=${inspection.id}`, '_blank')}
+            style={{ width: '100%', fontSize: '13px' }}
+          >
+            📄 导出 PDF
+          </button>
+        </div>
+      )}
+
       {/* 管理员删除按钮 */}
       {user?.role === 'admin' && inspection && (
         <div style={{ padding: '0 12px 24px 12px' }}>
