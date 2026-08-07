@@ -314,8 +314,8 @@ export default function NewInspectionPage() {
   };
 
   const handleSubmit = async () => {
-    if (!productName || !productCode || !colorNumber) {
-      alert('请填写产品名称、代码和色号');
+    if (!productName || !productCode || !colorNumber || !batchNumber) {
+      alert('请填写产品名称、代码、色号和首件批号信息');
       return;
     }
 
@@ -407,8 +407,8 @@ export default function NewInspectionPage() {
             </div>
           </div>
           <div style={{ marginBottom: '12px' }}>
-            <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '4px' }}>批号 <span style={{ color: '#999', fontSize: '11px' }}>(不参与比对)</span></label>
-            <input className="input-box" type="text" placeholder="请输入批号" value={batchNumber} onChange={(e) => setBatchNumber(e.target.value)} />
+            <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '4px' }}>首件批号信息 <span style={{ color: '#e74c3c' }}>*</span></label>
+            <input className="input-box" type="text" placeholder="请输入首件批号信息（必填）" value={batchNumber} onChange={(e) => setBatchNumber(e.target.value)} required />
           </div>
           <div>
             <label style={{ display: 'block', fontSize: '12px', color: '#666', marginBottom: '4px' }}>工单/指令单照片</label>

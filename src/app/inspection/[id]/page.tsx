@@ -513,7 +513,7 @@ export default function InspectionDetailPage({ params }: { params: Promise<{ id:
               <div className="info-value">{inspection.color_number}</div>
             </div>
             <div className="info-item">
-              <div className="info-label">批号</div>
+              <div className="info-label">首件批号信息</div>
               <div className="info-value" style={{ color: '#999' }}>{inspection.batch_number} <span style={{ fontSize: '10px' }}>(不参与比对)</span></div>
             </div>
             <div className="info-item">
