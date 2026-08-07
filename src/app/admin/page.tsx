@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import DashboardStats from '@/components/DashboardStats';
 
 interface User {
   id: number;
@@ -247,6 +248,9 @@ export default function AdminPage() {
           ←
         </button>
         <div className="title" style={{ flex: 1 }}>管理后台</div>
+        <button onClick={() => router.push('/dashboard')} style={{ background: 'rgba(255,255,255,0.2)', border: '1px solid rgba(255,255,255,0.3)', color: '#fff', borderRadius: '6px', padding: '4px 12px', fontSize: '13px', cursor: 'pointer' }}>
+          仪表盘
+        </button>
         <button onClick={() => router.push('/admin/archive')} style={{ background: 'rgba(255,255,255,0.2)', border: '1px solid rgba(255,255,255,0.3)', color: '#fff', borderRadius: '6px', padding: '4px 12px', fontSize: '13px', cursor: 'pointer' }}>
           归档管理
         </button>
@@ -339,7 +343,10 @@ export default function AdminPage() {
       )}
 
       {activeTab === 'records' && (
-        <AdminRecords />
+        <>
+          <DashboardStats />
+          <AdminRecords />
+        </>
       )}
 
       {activeTab === 'export' && (
