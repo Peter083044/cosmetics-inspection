@@ -69,8 +69,8 @@ export async function GET(request: NextRequest) {
       };
     });
 
-    // 生成CSV格式
-    const csv = generateCSV(exportData);
+    // 生成CSV格式，添加BOM以支持Excel正确显示中文
+    const csv = '\uFEFF' + generateCSV(exportData);
 
     return new NextResponse(csv, {
       headers: {

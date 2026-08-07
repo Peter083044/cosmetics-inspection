@@ -209,6 +209,7 @@ export default function NewInspectionPage() {
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = 'image/*';
+    input.capture = 'environment'; // 允许直接调用摄像头拍照
     input.onchange = async (e) => {
       const file = (e.target as HTMLInputElement).files?.[0];
       if (!file) return;
@@ -271,6 +272,7 @@ export default function NewInspectionPage() {
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = 'image/*';
+    input.capture = 'environment';
     input.onchange = async (e) => {
       const file = (e.target as HTMLInputElement).files?.[0];
       if (!file) return;
