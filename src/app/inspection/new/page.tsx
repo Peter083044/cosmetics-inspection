@@ -260,6 +260,25 @@ export default function NewInspectionPage() {
         const data = await res.json();
         if (data.success) {
           setInstructionOrderImage(data.url);
+          // 调用 OCR 识别产品信息
+          try {
+            const ocrRes = await fetch('/api/ocr', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ imageUrl: data.url }),
+            });
+            const ocrData = await ocrRes.json();
+            if (ocrData.success) {
+              if (ocrData.data.product_name) {
+                setProductName(ocrData.data.product_name);
+              }
+              if (ocrData.data.product_code) {
+                setProductCode(ocrData.data.product_code);
+              }
+            }
+          } catch (err) {
+            console.error('OCR 识别失败:', err);
+          }
         }
       } catch {
         alert('上传失败');

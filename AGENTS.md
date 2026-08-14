@@ -33,6 +33,7 @@ src/
 │       ├── inspections/[id]/approve/ # 审核操作
 │       ├── products/route.ts # 产品信息
 │       ├── upload/route.ts   # 文件上传
+│       ├── ocr/route.ts      # 工单OCR识别（自动提取产品名称/代码）
 │       ├── export/route.ts   # CSV导出
 │       ├── archive/route.ts  # 归档导出（ZIP打包）
 │       ├── cleanup/route.ts  # 记录清理
@@ -94,6 +95,12 @@ src/
 - 判定结果：通过/不通过
 - 不通过需填写差异说明
 - 批号信息不参与比对
+
+### 工单OCR识别
+- 上传工单图片后自动识别产品名称和产品代码
+- 使用 AI 视觉模型提取关键信息
+- 识别结果自动填充到基本信息表单
+- 用户可手动修改识别结果
 
 ### 标签核对
 - 支持最多4项标签核对（标签1~标签4）
