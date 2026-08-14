@@ -76,11 +76,7 @@ export function InstallPrompt() {
     return null;
   }
 
-  // Always show install button on mobile
-  if (!isMobile) {
-    return null;
-  }
-
+  // Always show install button on all devices
   return (
     <>
       {/* 底部固定安装按钮 */}
@@ -89,8 +85,12 @@ export function InstallPrompt() {
           <div className="flex items-center gap-2 flex-1">
             <Smartphone className="h-5 w-5 flex-shrink-0" />
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium truncate">下载安装 APP</p>
-              <p className="text-xs opacity-90 truncate">体验更佳，支持离线使用</p>
+              <p className="text-sm font-medium truncate">
+                {isMobile ? '下载安装 APP' : '安装到桌面'}
+              </p>
+              <p className="text-xs opacity-90 truncate">
+                {isMobile ? '体验更佳，支持离线使用' : '像 APP 一样使用，更方便'}
+              </p>
             </div>
           </div>
           <Button
@@ -104,24 +104,60 @@ export function InstallPrompt() {
         </div>
       </div>
 
-      {/* iOS 安装指南弹窗 */}
+      {/* 安装指南弹窗 */}
       {showIOSGuide && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
           <div className="bg-white rounded-lg max-w-sm w-full p-6">
-            <h3 className="text-lg font-bold mb-4">iOS 安装步骤</h3>
+            <h3 className="text-lg font-bold mb-4">
+              {isIOS ? 'iOS 安装步骤' : isMobile ? 'Android 安装步骤' : '电脑端安装步骤'}
+            </h3>
             <ol className="space-y-3 text-sm">
-              <li className="flex gap-2">
-                <span className="text-blue-600 font-bold">1.</span>
-                <span>点击浏览器底部的 <strong>分享</strong> 按钮</span>
-              </li>
-              <li className="flex gap-2">
-                <span className="text-blue-600 font-bold">2.</span>
-                <span>向下滑动找到 <strong>"添加到主屏幕"</strong></span>
-              </li>
-              <li className="flex gap-2">
-                <span className="text-blue-600 font-bold">3.</span>
-                <span>点击 <strong>"添加"</strong> 完成安装</span>
-              </li>
+              {isIOS ? (
+                <>
+                  <li className="flex gap-2">
+                    <span className="text-blue-600 font-bold">1.</span>
+                    <span>点击浏览器底部的 <strong>分享</strong> 按钮</span>
+                  </li>
+                  <li className="flex gap-2">
+                    <span className="text-blue-600 font-bold">2.</span>
+                    <span>向下滑动找到 <strong>"添加到主屏幕"</strong></span>
+                  </li>
+                  <li className="flex gap-2">
+                    <span className="text-blue-600 font-bold">3.</span>
+                    <span>点击 <strong>"添加"</strong> 完成安装</span>
+                  </li>
+                </>
+              ) : isMobile ? (
+                <>
+                  <li className="flex gap-2">
+                    <span className="text-blue-600 font-bold">1.</span>
+                    <span>点击浏览器右上角的 <strong>⋮</strong> 菜单</span>
+                  </li>
+                  <li className="flex gap-2">
+                    <span className="text-blue-600 font-bold">2.</span>
+                    <span>找到并点击 <strong>"添加到主屏幕"</strong> 或 <strong>"安装应用"</strong></span>
+                  </li>
+                  <li className="flex gap-2">
+                    <span className="text-blue-600 font-bold">3.</span>
+                    <span>点击 <strong>"添加"</strong> 完成安装</span>
+                  </li>
+                </>
+              ) : (
+                <>
+                  <li className="flex gap-2">
+                    <span className="text-blue-600 font-bold">1.</span>
+                    <span>点击浏览器地址栏右侧的 <strong>安装图标</strong>（📥）</span>
+                  </li>
+                  <li className="flex gap-2">
+                    <span className="text-blue-600 font-bold">2.</span>
+                    <span>在弹出的窗口中点击 <strong>"安装"</strong></span>
+                  </li>
+                  <li className="flex gap-2">
+                    <span className="text-blue-600 font-bold">3.</span>
+                    <span>或点击浏览器菜单 <strong>⋮ → 保存并分享 → 安装页面为应用</strong></span>
+                  </li>
+                </>
+              )}
             </ol>
             <Button
               onClick={() => setShowIOSGuide(false)}
