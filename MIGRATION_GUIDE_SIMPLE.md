@@ -1,87 +1,149 @@
-# 化妆品首件核对系统 - 傻瓜式迁移指南
+# 化妆品首件核对系统 - 超详细迁移操作手册
 
-> 本指南适合没有技术背景的用户，按照步骤一步步操作即可完成迁移。
-> 预计总时间：2-3 小时（分 2 天完成）
-
----
-
-## 第一天：准备工作 + 数据库迁移
-
-### 步骤 1：注册 GitHub 账号（10 分钟）
-
-1. 打开浏览器，访问：https://github.com
-2. 点击右上角 **"Sign up"**
-3. 输入邮箱地址，点击 **"Continue"**
-4. 设置密码，点击 **"Continue"**
-5. 输入用户名（如 `peter-chen`），点击 **"Continue"**
-6. 选择是否接收邮件通知，点击 **"Continue"**
-7. 完成人机验证
-8. 去邮箱点击验证链接
-
-**完成标志**: 看到 GitHub 首页，右上角显示你的用户名
+> 本手册包含每一步的具体网址、按钮名称、填写内容，按照说明操作即可。
 
 ---
 
-### 步骤 2：注册 Vercel 账号（5 分钟）
+## 第一步：注册 GitHub 账号
 
-1. 打开浏览器，访问：https://vercel.com
-2. 点击右上角 **"Sign Up"**
-3. 点击 **"Continue with GitHub"**（用刚才注册的 GitHub 账号登录）
-4. 授权 Vercel 访问你的 GitHub 账号
-5. 输入你的名字（随便填，如 `Peter`）
-6. 选择用途（选 **"Hobby"** 即可）
+### 1.1 打开注册页面
+**点击这个链接**：https://github.com/signup
 
-**完成标志**: 看到 Vercel 仪表盘页面
+### 1.2 填写邮箱
+- 在 **"Enter your email"** 输入框中，输入你的邮箱（如 `peter@example.com`）
+- 点击 **"Continue"** 按钮
 
----
+### 1.3 设置密码
+- 在 **"Create a password"** 输入框中，设置密码（至少 8 位，包含字母和数字）
+- 点击 **"Continue"** 按钮
 
-### 步骤 3：注册 Supabase 账号（10 分钟）
+### 1.4 选择用户名
+- 在 **"Choose a username"** 输入框中，输入用户名（如 `peter-chen-2026`）
+- 点击 **"Continue"** 按钮
+- 如果提示"用户名已存在"，换一个用户名
 
-1. 打开浏览器，访问：https://supabase.com
-2. 点击右上角 **"Start your project"** 或 **"Sign In"**
-3. 点击 **"Continue with GitHub"**（用 GitHub 账号登录）
-4. 授权 Supabase 访问你的 GitHub 账号
-5. 点击 **"New Project"**
+### 1.5 接收邮件
+- 选择 **"Receive product updates and announcements"**（可选）
+- 点击 **"Continue"** 按钮
 
-**完成标志**: 看到 Supabase 项目创建页面
+### 1.6 验证邮箱
+- 打开你的邮箱
+- 找到来自 GitHub 的邮件（标题：Please verify your email）
+- 点击邮件中的 **"Verify email address"** 按钮
 
----
-
-### 步骤 4：创建 Supabase 数据库项目（15 分钟）
-
-1. 在 Supabase 项目创建页面：
-   - **Name**: 输入 `cosmetics-inspection`
-   - **Database Password**: 设置一个密码（**一定要记住！** 如 `MyDB@2026`）
-   - **Region**: 选择 `Southeast Asia (Singapore)`（离中国近）
-2. 点击 **"Create new project"**
-3. 等待 2-3 分钟（页面会显示进度）
-
-**完成标志**: 看到 Supabase 项目仪表盘
+### 1.7 完成
+- 看到 GitHub 首页，右上角显示你的用户名
+- **注册完成！**
 
 ---
 
-### 步骤 5：获取 Supabase 连接信息（5 分钟）
+## 第二步：注册 Vercel 账号
 
-1. 在 Supabase 项目页面，点击左侧菜单 **"Project Settings"**（项目设置）
-2. 点击 **"API"**
-3. 找到 **"Project URL"**，复制这个地址（如 `https://xxx.supabase.co`）
-   - **保存到记事本**
-4. 找到 **"anon public"** 密钥，复制这个长字符串
-   - **保存到记事本**
+### 2.1 打开注册页面
+**点击这个链接**：https://vercel.com/signup
 
-**完成标志**: 记事本里有 2 行内容：
+### 2.2 选择登录方式
+- 点击 **"Continue with GitHub"** 按钮
+
+### 2.3 授权 GitHub
+- 如果弹出 GitHub 授权页面，点击 **"Authorize Vercel"** 按钮
+- 如果已登录 GitHub，会自动跳转
+
+### 2.4 填写信息
+- **What's your name?**: 输入你的名字（如 `Peter`）
+- 点击 **"Continue"** 按钮
+
+### 2.5 选择用途
+- 选择 **"Hobby"**（个人使用）
+- 点击 **"Continue"** 按钮
+
+### 2.6 完成
+- 看到 Vercel 仪表盘页面，显示 **"Welcome to Vercel"**
+- **注册完成！**
+
+---
+
+## 第三步：注册 Supabase 账号
+
+### 3.1 打开注册页面
+**点击这个链接**：https://supabase.com/dashboard/sign-in
+
+### 3.2 选择登录方式
+- 点击 **"Continue with GitHub"** 按钮
+
+### 3.3 授权 GitHub
+- 如果弹出 GitHub 授权页面，点击 **"Authorize Supabase"** 按钮
+
+### 3.4 完成
+- 看到 Supabase 仪表盘页面
+- **注册完成！**
+
+---
+
+## 第四步：创建 Supabase 数据库项目
+
+### 4.1 打开项目创建页面
+**点击这个链接**：https://supabase.com/dashboard/projects/new
+
+### 4.2 填写项目信息
+- **Name**: 输入 `cosmetics-inspection`
+- **Database Password**: 输入密码（如 `MyDB@2026`）
+  - ⚠️ **一定要记住这个密码！** 建议保存到记事本
+- **Region**: 点击下拉框，选择 **"Southeast Asia (Singapore)"**
+
+### 4.3 创建项目
+- 点击 **"Create new project"** 按钮（绿色，在页面底部）
+
+### 4.4 等待创建
+- 页面会显示进度条，等待 2-3 分钟
+- 看到 **"Welcome to your new project"** 表示创建成功
+
+### 4.5 完成
+- 看到 Supabase 项目仪表盘
+- **项目创建完成！**
+
+---
+
+## 第五步：获取 Supabase 连接信息
+
+### 5.1 打开项目设置
+- 在 Supabase 项目页面，点击左侧菜单 **"Project Settings"**（齿轮图标）
+
+### 5.2 打开 API 设置
+- 在项目设置页面，点击 **"API"**
+
+### 5.3 复制 Project URL
+- 找到 **"Project URL"** 部分
+- 点击右侧的复制图标（两个小方块）
+- 打开记事本，粘贴保存
+
+### 5.4 复制 anon public 密钥
+- 找到 **"Project API keys"** 部分
+- 找到 **"anon public"** 这一行
+- 点击右侧的复制图标
+- 打开记事本，粘贴保存
+
+### 5.5 完成
+- 记事本里应该有 2 行内容：
 ```
-SUPABASE_URL=https://xxx.supabase.co
-SUPABASE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+https://xxxxxxxxxxxxx.supabase.co
+eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.xxxxx...
 ```
+- **信息获取完成！**
 
 ---
 
-### 步骤 6：创建数据库表（20 分钟）
+## 第六步：创建数据库表
 
-1. 在 Supabase 左侧菜单，点击 **"SQL Editor"**（SQL 编辑器）
-2. 点击 **"New query"**（新建查询）
-3. 复制以下所有 SQL 代码，粘贴到编辑器中：
+### 6.1 打开 SQL 编辑器
+- 在 Supabase 左侧菜单，点击 **"SQL Editor"**（图标像代码）
+
+### 6.2 新建查询
+- 点击 **"New query"** 按钮（右上角）
+
+### 6.3 粘贴 SQL 代码
+- 清空编辑器中的内容
+- 复制以下所有代码，粘贴到编辑器中：
 
 ```sql
 -- 用户表
@@ -90,7 +152,7 @@ CREATE TABLE IF NOT EXISTS users (
   username TEXT UNIQUE NOT NULL,
   password TEXT NOT NULL,
   name TEXT NOT NULL,
-  role TEXT NOT NULL CHECK(role IN ('assistant', 'line_leader', 'qc', 'supervisor', 'admin')),
+  role TEXT NOT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -137,7 +199,7 @@ CREATE TABLE IF NOT EXISTS approvals (
   reviewer_id INTEGER REFERENCES users(id),
   reviewer_name TEXT,
   reviewer_role TEXT,
-  action TEXT NOT NULL CHECK(action IN ('approved', 'rejected', 'returned', 'submitted')),
+  action TEXT NOT NULL,
   comment TEXT,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -149,224 +211,312 @@ CREATE INDEX IF NOT EXISTS idx_inspections_reviewer ON inspections(current_revie
 CREATE INDEX IF NOT EXISTS idx_approvals_inspection ON approvals(inspection_id);
 ```
 
-4. 点击右下角 **"Run"**（运行）按钮
-5. 看到下方显示 **"Success. No rows returned"** 表示成功
+### 6.4 运行 SQL
+- 点击右下角 **"Run"** 按钮（或按 `Ctrl+Enter`）
 
-**完成标志**: 左侧菜单 **"Table Editor"** 里能看到 4 个表：users、products、inspections、approvals
+### 6.5 查看结果
+- 下方显示 **"Success. No rows returned"** 表示成功
+- 如果有错误，检查是否复制完整
 
----
+### 6.6 验证表创建
+- 点击左侧菜单 **"Table Editor"**（图标像表格）
+- 应该看到 4 个表：`users`、`products`、`inspections`、`approvals`
 
-### 步骤 7：注册阿里云账号（15 分钟）
-
-1. 打开浏览器，访问：https://www.aliyun.com
-2. 点击右上角 **"免费注册"**
-3. 用支付宝或淘宝账号登录（或注册新账号）
-4. 完成实名认证（需要身份证，5 分钟）
-
-**完成标志**: 看到阿里云控制台首页
+### 6.7 完成
+- **数据库表创建完成！**
 
 ---
 
-### 步骤 8：创建 OSS 存储桶（20 分钟）
+## 第七步：注册阿里云账号
 
-1. 在阿里云控制台，搜索 **"OSS"** 或 **"对象存储"**
-2. 点击 **"对象存储 OSS"**
-3. 点击 **"创建 Bucket"**（存储桶）
-4. 填写信息：
-   - **Bucket 名称**: `cosmetics-inspection-photos`（必须英文小写）
-   - **地域**: 选择离你近的（如 `华东 1（杭州）`）
-   - **读写权限**: 选择 **"公共读"**（重要！）
-5. 点击 **"确定"**
+### 7.1 打开注册页面
+**点击这个链接**：https://account.aliyun.com/register/register.htm
 
-**完成标志**: 看到存储桶列表里有 `cosmetics-inspection-photos`
+### 7.2 选择注册方式
+- 如果有支付宝/淘宝账号，点击 **"支付宝登录"** 或 **"淘宝登录"**
+- 如果没有，点击 **"邮箱注册"** 或 **"手机号注册"**
+
+### 7.3 填写信息
+- 按照页面提示填写邮箱/手机号、密码等
+- 点击 **"同意协议并注册"**
+
+### 7.4 实名认证
+- 登录后，点击页面顶部的 **"实名认证"**
+- 选择 **"个人实名认证"**
+- 输入姓名、身份证号
+- 点击 **"提交"**
+- 等待审核（通常 5 分钟）
+
+### 7.5 完成
+- 看到阿里云控制台首页
+- **注册完成！**
 
 ---
 
-### 步骤 9：获取阿里云 AccessKey（10 分钟）
+## 第八步：创建 OSS 存储桶
 
-1. 在阿里云控制台，点击右上角头像
-2. 点击 **"AccessKey 管理"**
-3. 点击 **"继续使用 AccessKey"**
-4. 点击 **"创建新的 AccessKey"**
-5. 复制 **AccessKey ID** 和 **AccessKey Secret**
-   - **保存到记事本**（和 Supabase 信息放一起）
+### 8.1 打开 OSS 控制台
+**点击这个链接**：https://oss.console.aliyun.com/bucket
 
-**完成标志**: 记事本里有 4 行内容：
+### 8.2 创建 Bucket
+- 点击 **"创建 Bucket"** 按钮（右上角，蓝色）
+
+### 8.3 填写 Bucket 信息
+- **Bucket 名称**: 输入 `cosmetics-inspection-photos`
+  - ⚠️ 必须全部小写，不能有空格
+- **地域**: 点击下拉框，选择 **"华东 1（杭州）"**（或离你近的）
+- **读写权限**: 点击 **"公共读"**（重要！）
+- 其他保持默认
+
+### 8.4 确认创建
+- 点击 **"确定"** 按钮（底部）
+
+### 8.5 完成
+- 看到存储桶列表里有 `cosmetics-inspection-photos`
+- **存储桶创建完成！**
+
+---
+
+## 第九步：获取阿里云 AccessKey
+
+### 9.1 打开 AccessKey 管理页面
+**点击这个链接**：https://ram.console.aliyun.com/manage/ak
+
+### 9.2 继续使用 AccessKey
+- 如果弹出提示框，点击 **"继续使用 AccessKey"**
+
+### 9.3 创建新的 AccessKey
+- 点击 **"创建新的 AccessKey"** 按钮（右上角）
+
+### 9.4 验证身份
+- 可能需要手机验证码，输入验证码
+
+### 9.5 复制 AccessKey
+- 弹出窗口显示 **AccessKey ID** 和 **AccessKey Secret**
+- 点击 **"复制"** 按钮，分别复制这两个值
+- 保存到记事本（和 Supabase 信息放一起）
+
+### 9.6 完成
+- 记事本里应该有 4 行内容：
 ```
-SUPABASE_URL=https://xxx.supabase.co
-SUPABASE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-AWS_ACCESS_KEY_ID=LTAIxxx
-AWS_SECRET_ACCESS_KEY=xxx
+SUPABASE_URL=https://xxxxxxxxxxxxx.supabase.co
+SUPABASE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.xxxxx...
+AWS_ACCESS_KEY_ID=LTAIxxxxxxxxxxxx
+AWS_SECRET_ACCESS_KEY=xxxxxxxxxxxxxxxxxxxxxxxx
 ```
+- **AccessKey 获取完成！**
 
 ---
 
-### 第一天完成！✅
+## 第十步：上传代码到 GitHub
 
-休息一下吧，明天继续代码迁移。
+### 10.1 打开终端
+- 在当前项目目录（`/workspace/projects`）打开终端
+- 如果是 Windows，右键点击文件夹 → **"在此处打开 PowerShell"**
+- 如果是 Mac，打开终端，输入 `cd /workspace/projects`
 
----
-
-## 第二天：代码迁移 + 部署上线
-
-### 步骤 10：安装 Git（如果已安装可跳过）（10 分钟）
-
-**Windows**:
-1. 访问：https://git-scm.com/download/win
-2. 下载并安装，一路点 **"Next"**
-
-**Mac**:
-1. 打开终端（Terminal）
-2. 输入 `git --version`
-3. 如果提示安装，点击 **"安装"**
-
-**验证**: 打开命令行，输入 `git --version`，显示版本号即成功
-
----
-
-### 步骤 11：上传代码到 GitHub（20 分钟）
-
-1. 在当前项目目录（`/workspace/projects`）打开终端
-2. 依次输入以下命令（每行输入后按回车）：
-
+### 10.2 初始化 Git
+- 输入以下命令，按回车：
 ```bash
-# 初始化 Git 仓库
 git init
-
-# 添加所有文件
-git add .
-
-# 提交代码
-git commit -m "初始提交：化妆品首件核对系统"
-
-# 创建主分支
-git branch -M main
 ```
 
-3. 在浏览器打开 GitHub，点击右上角 **"+"** → **"New repository"**
-4. 填写：
-   - **Repository name**: `cosmetics-inspection`
-   - 选择 **"Public"**
-   - **不要勾选** "Add a README file"
-5. 点击 **"Create repository"**
-6. 复制页面显示的命令（类似）：
+### 10.3 添加文件
+- 输入以下命令，按回车：
+```bash
+git add .
+```
+
+### 10.4 提交代码
+- 输入以下命令，按回车：
+```bash
+git commit -m "初始提交"
+```
+
+### 10.5 创建 GitHub 仓库
+**点击这个链接**：https://github.com/new
+
+- **Repository name**: 输入 `cosmetics-inspection`
+- 选择 **"Public"**
+- **不要勾选** "Add a README file"
+- 点击 **"Create repository"** 按钮（底部）
+
+### 10.6 复制推送命令
+- 在创建的仓库页面，找到 **"...or push an existing repository from the command line"**
+- 复制下面的命令（类似）：
 ```bash
 git remote add origin https://github.com/你的用户名/cosmetics-inspection.git
+git branch -M main
 git push -u origin main
 ```
-7. 在终端粘贴执行
 
-**完成标志**: GitHub 仓库页面显示项目文件
+### 10.7 推送代码
+- 在终端粘贴刚才复制的命令，按回车
+- 如果弹出登录框，输入 GitHub 用户名和密码
 
----
-
-### 步骤 12：连接 Vercel（10 分钟）
-
-1. 打开 Vercel 仪表盘：https://vercel.com/dashboard
-2. 点击 **"Add New..."** → **"Project"**
-3. 找到 `cosmetics-inspection` 仓库，点击 **"Import"**
-4. 在 **"Configure Project"** 页面：
-   - **Framework Preset**: 选择 `Next.js`
-   - 其他保持默认
-5. 点击 **"Deploy"**
-6. 等待 2-3 分钟
-
-**完成标志**: 看到 **"Congratulations!"** 页面，有一个 `.vercel.app` 的网址
+### 10.8 完成
+- GitHub 仓库页面显示项目文件
+- **代码上传完成！**
 
 ---
 
-### 步骤 13：配置环境变量（15 分钟）
+## 第十一步：连接 Vercel
 
-1. 在 Vercel 项目页面，点击 **"Settings"**
-2. 点击左侧 **"Environment Variables"**
-3. 依次添加以下变量（点击 **"Add"** 添加每一个）：
+### 11.1 打开 Vercel 导入页面
+**点击这个链接**：https://vercel.com/new
 
-| Name | Value | 来源 |
-|------|-------|------|
-| `NEXT_PUBLIC_SUPABASE_URL` | 步骤 5 的 URL | 记事本 |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | 步骤 5 的 Key | 记事本 |
-| `AWS_REGION` | `cn-hangzhou` 或你选的地域 | 步骤 8 |
-| `AWS_ACCESS_KEY_ID` | 步骤 9 的 ID | 记事本 |
-| `AWS_SECRET_ACCESS_KEY` | 步骤 9 的 Secret | 记事本 |
-| `AWS_BUCKET_NAME` | `cosmetics-inspection-photos` | 步骤 8 |
-| `JWT_SECRET` | `my-secret-key-12345` | 随便设置 |
+### 11.2 选择仓库
+- 找到 `cosmetics-inspection` 仓库
+- 点击 **"Import"** 按钮
 
-4. 每个变量填完后点击 **"Save"**
+### 11.3 配置项目
+- **Framework Preset**: 点击下拉框，选择 **"Next.js"**
+- 其他保持默认
 
-**完成标志**: 环境变量列表里有 7 个变量
+### 11.4 部署
+- 点击 **"Deploy"** 按钮（底部）
 
----
+### 11.5 等待部署
+- 页面显示部署进度，等待 2-3 分钟
 
-### 步骤 14：重新部署（5 分钟）
-
-1. 在 Vercel 项目页面，点击 **"Deployments"**
-2. 找到最新的部署，点击右侧 **"..."** → **"Redeploy"**
-3. 等待 2-3 分钟
-
-**完成标志**: 部署状态显示 **"Ready"**
+### 11.6 完成
+- 看到 **"Congratulations!"** 页面
+- 有一个 `.vercel.app` 的网址
+- **部署完成！**
 
 ---
 
-### 步骤 15：测试系统（20 分钟）
+## 第十二步：配置环境变量
 
-1. 在 Vercel 项目页面，点击顶部的 **.vercel.app 网址**
-2. 测试以下功能：
-   - [ ] 能打开登录页面
-   - [ ] 用 `admin` / `admin123` 能登录
-   - [ ] 能看到仪表盘
-   - [ ] 能创建检验记录
-   - [ ] 能上传照片
-   - [ ] 能提交审核
+### 12.1 打开环境变量设置
+- 在 Vercel 项目页面，点击 **"Settings"**（顶部菜单）
+- 点击左侧 **"Environment Variables"**
 
-**完成标志**: 所有功能正常
+### 12.2 添加第一个变量
+- 点击 **"Add"** 按钮
+- **Name**: 输入 `NEXT_PUBLIC_SUPABASE_URL`
+- **Value**: 粘贴步骤 5 的 Project URL
+- **Environment**: 选择 **"Production"**
+- 点击 **"Save"** 按钮
+
+### 12.3 添加第二个变量
+- 点击 **"Add"** 按钮
+- **Name**: 输入 `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- **Value**: 粘贴步骤 5 的 anon public 密钥
+- **Environment**: 选择 **"Production"**
+- 点击 **"Save"** 按钮
+
+### 12.4 添加第三个变量
+- 点击 **"Add"** 按钮
+- **Name**: 输入 `AWS_REGION`
+- **Value**: 输入 `cn-hangzhou`（或你选的地域）
+- **Environment**: 选择 **"Production"**
+- 点击 **"Save"** 按钮
+
+### 12.5 添加第四个变量
+- 点击 **"Add"** 按钮
+- **Name**: 输入 `AWS_ACCESS_KEY_ID`
+- **Value**: 粘贴步骤 9 的 AccessKey ID
+- **Environment**: 选择 **"Production"**
+- 点击 **"Save"** 按钮
+
+### 12.6 添加第五个变量
+- 点击 **"Add"** 按钮
+- **Name**: 输入 `AWS_SECRET_ACCESS_KEY`
+- **Value**: 粘贴步骤 9 的 AccessKey Secret
+- **Environment**: 选择 **"Production"**
+- 点击 **"Save"** 按钮
+
+### 12.7 添加第六个变量
+- 点击 **"Add"** 按钮
+- **Name**: 输入 `AWS_BUCKET_NAME`
+- **Value**: 输入 `cosmetics-inspection-photos`
+- **Environment**: 选择 **"Production"**
+- 点击 **"Save"** 按钮
+
+### 12.8 添加第七个变量
+- 点击 **"Add"** 按钮
+- **Name**: 输入 `JWT_SECRET`
+- **Value**: 输入 `my-secret-key-12345`
+- **Environment**: 选择 **"Production"**
+- 点击 **"Save"** 按钮
+
+### 12.9 完成
+- 环境变量列表里有 7 个变量
+- **配置完成！**
 
 ---
 
-### 步骤 16：绑定自定义域名（可选）（15 分钟）
+## 第十三步：重新部署
 
-1. 购买域名（如 `inspection.yourcompany.com`）
-   - 阿里云、腾讯云都可以买，约 50 元/年
-2. 在 Vercel 项目页面，点击 **"Settings"** → **"Domains"**
-3. 输入你的域名，点击 **"Add"**
-4. 按照提示配置 DNS 解析
-5. 等待 10-30 分钟生效
+### 13.1 打开部署页面
+- 在 Vercel 项目页面，点击 **"Deployments"**（顶部菜单）
 
-**完成标志**: 用自定义域名能访问系统
+### 13.2 重新部署
+- 找到最新的部署（第一个）
+- 点击右侧 **"..."** 按钮
+- 点击 **"Redeploy"**
+
+### 13.3 等待部署
+- 等待 2-3 分钟
+
+### 13.4 完成
+- 部署状态显示 **"Ready"**
+- **重新部署完成！**
+
+---
+
+## 第十四步：测试系统
+
+### 14.1 打开系统
+- 在 Vercel 项目页面，点击顶部的 **.vercel.app 网址**
+
+### 14.2 测试登录
+- 用户名：`admin`
+- 密码：`admin123`
+- 点击 **"登录"** 按钮
+
+### 14.3 测试功能
+- [ ] 能看到仪表盘
+- [ ] 能创建检验记录
+- [ ] 能上传照片
+- [ ] 能提交审核
+
+### 14.4 完成
+- 所有功能正常
+- **测试完成！**
 
 ---
 
 ## 迁移完成！
 
-### 你现在拥有：
+你现在拥有：
 - ✅ 24 小时在线的系统
 - ✅ 安全可靠的云数据库
 - ✅ 永久保存的照片存储
 - ✅ 自动部署的代码更新
 
-### 以后更新代码：
+---
+
+## 以后更新代码
+
 1. 修改代码
-2. 提交到 GitHub：`git add . && git commit -m "修改说明" && git push`
+2. 在终端输入：
+```bash
+git add .
+git commit -m "修改说明"
+git push
+```
 3. Vercel 自动部署（1-2 分钟）
 4. 完成！
 
 ---
 
-## 常见问题
-
-### Q: 部署失败怎么办？
-A: 在 Vercel 点击 **"Deployments"** → 找到失败的部署 → 点击 **"View Build Logs"** 查看错误信息
-
-### Q: 数据库连不上？
-A: 检查环境变量 `NEXT_PUBLIC_SUPABASE_URL` 和 `NEXT_PUBLIC_SUPABASE_ANON_KEY` 是否正确
-
-### Q: 照片上传失败？
-A: 检查 OSS Bucket 权限是否为 **"公共读"**，AccessKey 是否正确
-
-### Q: 想回滚到旧版本？
-A: 在 Vercel **"Deployments"** 找到旧版本 → 点击 **"..."** → **"Rollback"**
-
----
-
 ## 需要帮助？
 
-如果在任何步骤遇到问题，告诉我具体的步骤编号和错误信息，我会帮你解决。
+如果在任何步骤遇到问题，告诉我：
+1. 你在第几步
+2. 看到了什么错误信息
+3. 截图（如果可能）
+
+我会帮你解决！
