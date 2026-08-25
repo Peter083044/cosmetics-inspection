@@ -13,13 +13,15 @@ export async function POST(request: NextRequest) {
     }
 
     const user = await db.users.findByUsername(username);
+    console.log('Login attempt:', username, 'User found:', !!user, user ? { id: user.id, username: user.username, hasPassword: !!user.password } : null);
     if (!user) {
-      return NextResponse.json({ error: '用户名或密码错误' }, { status: 401 });
+      return NextResponse.json({ error: '用户名或密码错误 (用户不存在)' }, { status: 401 });
     }
 
     const isValid = await verifyPassword(password, user.password);
+    console.log('Password verify:', { isValid, storedHash: user.password?.substring(0, 20) });
     if (!isValid) {
-      return NextResponse.json({ error: '用户名或密码错误' }, { status: 401 });
+      return NextResponse.json({ error: '用户名或密码错误 (密码不匹配)' }, { status: 401 });
     }
 
     const token = await generateToken(user);

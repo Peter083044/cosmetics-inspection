@@ -70,12 +70,14 @@ export interface Approval {
 export const db = {
   users: {
     async findByUsername(username: string): Promise<User | null> {
+      console.log('Supabase findByUsername:', { username, supabaseUrl, hasKey: !!supabaseKey });
       const { data, error } = await supabase
         .from('users')
         .select('*')
         .eq('username', username)
         .single();
       
+      console.log('Supabase result:', { data, error });
       if (error) return null;
       return data as User;
     },
