@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/db';
+import { supabase } from '@/lib/db';
 import { getCurrentUser, isAdmin } from '@/lib/auth';
 
 // GET /api/backup - 获取备份数据
@@ -15,19 +15,19 @@ export async function GET(request: NextRequest) {
     }
 
     // 获取所有数据
-    const { data: users, error: usersError } = await db
+    const { data: users, error: usersError } = await supabase
       .from('users')
       .select('*');
 
-    const { data: products, error: productsError } = await db
+    const { data: products, error: productsError } = await supabase
       .from('products')
       .select('*');
 
-    const { data: inspections, error: inspectionsError } = await db
+    const { data: inspections, error: inspectionsError } = await supabase
       .from('inspections')
       .select('*');
 
-    const { data: approvals, error: approvalsError } = await db
+    const { data: approvals, error: approvalsError } = await supabase
       .from('approvals')
       .select('*');
 
@@ -42,10 +42,10 @@ export async function GET(request: NextRequest) {
     }
 
     return NextResponse.json({
-      users,
-      products,
-      inspections,
-      approvals,
+      users: users || [],
+      products: products || [],
+      inspections: inspections || [],
+      approvals: approvals || [],
       exportedAt: new Date().toISOString(),
     });
   } catch (error) {

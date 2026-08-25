@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { getCurrentUser, isAdmin } from '@/lib/auth';
+import { getCurrentUser } from '@/lib/auth';
 
 // GET /api/pdf - 生成 PDF 报告
 export async function GET(request: NextRequest) {
@@ -11,23 +11,21 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url);
-    const inspectionId = searchParams.get('id');
+    const inspectionId = parseInt(searchParams.get('id') || '0');
 
     if (!inspectionId) {
       return NextResponse.json({ error: '请指定检验记录 ID' }, { status: 400 });
     }
 
     // 获取检验记录
-    const { data: inspection, error } = await db.inspections.getById(inspectionId);
+    const inspection = await db.inspections.findById(inspectionId);
     
-    if (error || !inspection) {
+    if (!inspection) {
       return NextResponse.json({ error: '检验记录不存在' }, { status: 404 });
     }
 
     // 获取审核日志
-    const { data: approvals, error: approvalError } = await db.approvals.getByInspectionId(inspectionId);
-    
-    if (approvalError) throw approvalError;
+    const approvals = await db.approvals.findByInspection(inspectionId);
 
     // 返回数据供前端生成 PDF
     return NextResponse.json({

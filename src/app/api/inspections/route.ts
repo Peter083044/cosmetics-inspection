@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/db';
+import { supabase, db } from '@/lib/db';
 import { getCurrentUser, isAdmin } from '@/lib/auth';
 
 // GET /api/inspections - 获取检验记录列表
@@ -15,7 +15,11 @@ export async function GET(request: NextRequest) {
     const page = parseInt(searchParams.get('page') || '1');
     const limit = parseInt(searchParams.get('limit') || '20');
 
-    let query = db.inspections.getAll();
+    let query = supabase
+      .from('inspections')
+      .select('*, users!inspections_assistant_id_fkey(name)', { count: 'exact' })
+      .order('created_at', { ascending: false })
+      .range((page - 1) * limit, page * limit - 1);
     
     if (status) {
       query = query.eq('status', status);
@@ -30,16 +34,13 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const { data, error, count } = await query
-      .order('created_at', { ascending: false })
-      .range((page - 1) * limit, page * limit - 1)
-      .select('*, users!inspections_assistant_id_fkey(name)');
+    const { data, error, count } = await query;
 
     if (error) throw error;
 
     return NextResponse.json({
-      inspections: data,
-      total: count,
+      inspections: data || [],
+      total: count || 0,
       page,
       limit,
     });
@@ -72,7 +73,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: '请填写完整的基本信息' }, { status: 400 });
     }
 
-    const { data, error } = await db.inspections.create({
+    const newInspection = await db.inspections.create({
       inspection_date: inspection_date || new Date().toISOString().split('T')[0],
       product_name,
       product_code,
@@ -83,13 +84,15 @@ export async function POST(request: NextRequest) {
       status: 'draft',
       comparisons: comparisons || [],
       label_comparisons: label_comparisons || [],
-    });
+    } as any);
 
-    if (error) throw error;
+    if (!newInspection) {
+      return NextResponse.json({ error: '创建检验记录失败' }, { status: 500 });
+    }
 
     return NextResponse.json({
       success: true,
-      inspection: data,
+      inspection: newInspection,
     });
   } catch (error) {
     console.error('Create inspection error:', error);
@@ -112,8 +115,10 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: '请指定要删除的记录 ID' }, { status: 400 });
     }
 
-    const { error } = await db.inspections.delete(ids);
-    if (error) throw error;
+    const success = await db.inspections.deleteByIds(ids);
+    if (!success) {
+      return NextResponse.json({ error: '删除检验记录失败' }, { status: 500 });
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {

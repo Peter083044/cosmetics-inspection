@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/db';
-import { getCurrentUser, isAdmin } from '@/lib/auth';
+import { supabase } from '@/lib/db';
+import { getCurrentUser } from '@/lib/auth';
 
 // GET /api/notifications - 获取通知列表
 export async function GET(request: NextRequest) {
@@ -11,7 +11,7 @@ export async function GET(request: NextRequest) {
     }
 
     // 获取待审核的检验记录
-    const { data: pendingReviews, error } = await db
+    const { data: pendingReviews, error } = await supabase
       .from('inspections')
       .select('*')
       .eq('current_reviewer_id', user.id)
@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
     }
 
     return NextResponse.json({
-      notifications: pendingReviews.map((item) => ({
+      notifications: (pendingReviews || []).map((item: any) => ({
         id: item.id,
         type: 'review_request',
         title: `检验记录待审核：${item.product_name}`,

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/db';
+import { supabase, db } from '@/lib/db';
 import { getCurrentUser } from '@/lib/auth';
 
 // GET /api/users - 获取用户列表
@@ -13,13 +13,16 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const role = searchParams.get('role');
 
-    let query = db.users.getAll();
+    let query = supabase
+      .from('users')
+      .select('*')
+      .order('created_at', { ascending: false });
     
     if (role) {
       query = query.eq('role', role);
     }
 
-    const { data, error } = await query.order('created_at', { ascending: false });
+    const { data, error } = await query;
     if (error) throw error;
 
     return NextResponse.json({ users: data });
@@ -47,23 +50,20 @@ export async function POST(request: NextRequest) {
     const { hashPassword } = await import('@/lib/auth');
     const hashedPassword = await hashPassword(password);
 
-    const { data, error } = await db.users.create({
+    const newUser = await db.users.create({
       username,
       password: hashedPassword,
       name,
       role,
     });
 
-    if (error) {
-      if (error.message?.includes('duplicate')) {
-        return NextResponse.json({ error: '用户名已存在' }, { status: 400 });
-      }
-      throw error;
+    if (!newUser) {
+      return NextResponse.json({ error: '用户名已存在' }, { status: 400 });
     }
 
     return NextResponse.json({
       success: true,
-      user: { id: data.id, username, name, role },
+      user: { id: newUser.id, username, name, role },
     });
   } catch (error) {
     console.error('Create user error:', error);
@@ -89,8 +89,10 @@ export async function PUT(request: NextRequest) {
       updateData.password = await hashPassword(password);
     }
 
-    const { error } = await db.users.update(id, updateData);
-    if (error) throw error;
+    const updated = await db.users.update(id, updateData);
+    if (!updated) {
+      return NextResponse.json({ error: '更新用户失败' }, { status: 500 });
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {
@@ -114,8 +116,10 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: '请指定用户 ID' }, { status: 400 });
     }
 
-    const { error } = await db.users.delete(parseInt(id));
-    if (error) throw error;
+    const success = await db.users.delete(parseInt(id));
+    if (!success) {
+      return NextResponse.json({ error: '删除用户失败' }, { status: 500 });
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {

@@ -15,15 +15,7 @@ export async function GET(request: NextRequest) {
     }
 
     // 检查数据库连接
-    const { error } = await db.from('inspections').select('id').limit(1);
-
-    if (error) {
-      console.error('Health check error:', error);
-      return NextResponse.json(
-        { status: 'error', message: '数据库连接失败' },
-        { status: 500 }
-      );
-    }
+    const inspections = await db.inspections.getAll();
 
     return NextResponse.json({
       status: 'ok',

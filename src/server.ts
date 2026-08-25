@@ -1,13 +1,15 @@
 import { createServer } from 'http';
 import { parse } from 'url';
 import next from 'next';
+import path from 'path';
 
 const dev = process.env.COZE_PROJECT_ENV !== 'PROD';
 const hostname = process.env.HOSTNAME || 'localhost';
 const port = parseInt(process.env.PORT || '5000', 10);
+const appDir = path.resolve(process.env.COZE_WORKSPACE_PATH || process.cwd());
 
-// Create Next.js app
-const app = next({ dev, hostname, port });
+// Create Next.js app with explicit dir
+const app = next({ dev, hostname, port, dir: appDir, turbopack: false } as any);
 const handle = app.getRequestHandler();
 
 app.prepare().then(() => {

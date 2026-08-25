@@ -11,10 +11,7 @@ export async function GET(request: NextRequest) {
     }
 
     // 获取所有检验记录
-    const { data: inspections, error } = await db.inspections.getAll()
-      .order('created_at', { ascending: false });
-    
-    if (error) throw error;
+    const inspections = await db.inspections.getAll();
 
     // 统计总数
     const totalRecords = inspections.length;
@@ -30,9 +27,10 @@ export async function GET(request: NextRequest) {
     let passedCount = 0;
     let totalCount = 0;
     for (const inspection of inspections) {
-      if (inspection.comparisons) {
-        for (const key of Object.keys(inspection.comparisons)) {
-          const comp = inspection.comparisons[key];
+      const comparisons = inspection.comparisons as any;
+      if (comparisons) {
+        for (const key of Object.keys(comparisons)) {
+          const comp = comparisons[key];
           if (comp && comp.status) {
             totalCount++;
             if (comp.status === 'passed') {

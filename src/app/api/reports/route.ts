@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/db';
+import { supabase } from '@/lib/db';
 import { getCurrentUser, isAdmin } from '@/lib/auth';
 
 // GET /api/reports - 获取报表数据
@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
     const startDate = searchParams.get('startDate');
     const endDate = searchParams.get('endDate');
 
-    let query = db
+    let query = supabase
       .from('inspections')
       .select('*')
       .order('created_at', { ascending: false });

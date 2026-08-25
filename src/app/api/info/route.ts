@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/db';
+import { supabase } from '@/lib/db';
 import { getCurrentUser, isAdmin } from '@/lib/auth';
 
 // GET /api/info - 获取系统信息
@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
     }
 
     // 获取所有检验记录
-    const { data: inspections, error } = await db
+    const { data: inspections, error } = await supabase
       .from('inspections')
       .select('*')
       .order('created_at', { ascending: false });
@@ -25,18 +25,20 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: '获取系统信息失败' }, { status: 500 });
     }
 
+    const list = inspections || [];
+
     // 统计
     const info = {
-      total: inspections.length,
-      approved: inspections.filter((i) => i.status === 'approved').length,
-      rejected: inspections.filter((i) => i.status === 'rejected').length,
-      pending: inspections.filter(
-        (i) =>
+      total: list.length,
+      approved: list.filter((i: any) => i.status === 'approved').length,
+      rejected: list.filter((i: any) => i.status === 'rejected').length,
+      pending: list.filter(
+        (i: any) =>
           i.status !== 'approved' &&
           i.status !== 'rejected' &&
           i.status !== 'draft'
       ).length,
-      draft: inspections.filter((i) => i.status === 'draft').length,
+      draft: list.filter((i: any) => i.status === 'draft').length,
     };
 
     return NextResponse.json({ info });

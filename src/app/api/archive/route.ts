@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/db';
+import { db, supabase } from '@/lib/db';
 import { getCurrentUser, isAdmin } from '@/lib/auth';
 
 // GET /api/archive - 获取归档信息
@@ -14,7 +14,10 @@ export async function GET(request: NextRequest) {
     const startDate = searchParams.get('startDate');
     const endDate = searchParams.get('endDate');
 
-    let query = db.inspections.getAll();
+    let query = supabase
+      .from('inspections')
+      .select('*')
+      .order('created_at', { ascending: false });
 
     if (startDate) {
       query = query.gte('created_at', startDate);
@@ -23,14 +26,13 @@ export async function GET(request: NextRequest) {
       query = query.lte('created_at', endDate + 'T23:59:59');
     }
 
-    const { data: inspections, error } = await query
-      .order('created_at', { ascending: false });
+    const { data: inspections, error } = await query;
     
     if (error) throw error;
 
     return NextResponse.json({
-      records: inspections,
-      count: inspections.length,
+      records: inspections || [],
+      count: inspections?.length || 0,
     });
   } catch (error) {
     console.error('Get archive error:', error);

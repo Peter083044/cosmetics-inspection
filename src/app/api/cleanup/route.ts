@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/db';
+import { supabase, db } from '@/lib/db';
 import { getCurrentUser, isAdmin } from '@/lib/auth';
 
 // GET /api/cleanup - 获取清理信息
@@ -13,7 +13,10 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const beforeDate = searchParams.get('beforeDate');
 
-    let query = db.inspections.getAll();
+    let query = supabase
+      .from('inspections')
+      .select('*')
+      .order('created_at', { ascending: false });
 
     if (beforeDate) {
       query = query.lt('created_at', beforeDate);
@@ -24,8 +27,8 @@ export async function GET(request: NextRequest) {
     if (error) throw error;
 
     return NextResponse.json({
-      records: inspections,
-      count: inspections.length,
+      records: inspections || [],
+      count: inspections?.length || 0,
     });
   } catch (error) {
     console.error('Get cleanup error:', error);

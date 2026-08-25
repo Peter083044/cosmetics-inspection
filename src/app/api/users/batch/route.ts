@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getCurrentUser, isAdmin } from '@/lib/auth';
+import { hashPassword } from '@/lib/auth';
 
 // GET /api/users/batch - 批量创建用户
 export async function GET(request: NextRequest) {
@@ -33,21 +34,21 @@ export async function GET(request: NextRequest) {
     for (let i = 1; i <= count; i++) {
       const username = `${prefix}${i}`;
       const name = `${prefix}${i}`;
-      const hashedPassword = await hashPassword(password);
+      const hashedPwd = await hashPassword(password);
 
-      const { data, error } = await db.users.create({
+      const newUser = await db.users.create({
         username,
-        password: hashedPassword,
+        password: hashedPwd,
         name,
         role,
       });
 
-      if (error) {
-        console.error(`Failed to create user ${username}:`, error);
+      if (!newUser) {
+        console.error(`Failed to create user ${username}`);
         continue;
       }
 
-      createdUsers.push(data);
+      createdUsers.push(newUser);
     }
 
     return NextResponse.json({
@@ -90,21 +91,21 @@ export async function POST(request: NextRequest) {
     for (let i = 1; i <= count; i++) {
       const username = `${prefix}${i}`;
       const name = `${prefix}${i}`;
-      const hashedPassword = await hashPassword(password);
+      const hashedPwd = await hashPassword(password);
 
-      const { data, error } = await db.users.create({
+      const newUser = await db.users.create({
         username,
-        password: hashedPassword,
+        password: hashedPwd,
         name,
         role,
       });
 
-      if (error) {
-        console.error(`Failed to create user ${username}:`, error);
+      if (!newUser) {
+        console.error(`Failed to create user ${username}`);
         continue;
       }
 
-      createdUsers.push(data);
+      createdUsers.push(newUser);
     }
 
     return NextResponse.json({
@@ -116,13 +117,4 @@ export async function POST(request: NextRequest) {
     console.error('Batch create users error:', error);
     return NextResponse.json({ error: '批量创建用户失败' }, { status: 500 });
   }
-}
-
-async function hashPassword(password: string): Promise<string> {
-  // 使用简单的哈希（生产环境应使用 bcrypt）
-  const encoder = new TextEncoder();
-  const data = encoder.encode(password);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 }

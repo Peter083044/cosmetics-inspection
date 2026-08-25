@@ -11,7 +11,9 @@ const nextConfig: NextConfig = {
       },
     ],
   },
-  serverExternalPackages: ['better-sqlite3'],
+  turbopack: {
+    root: '/workspace/projects',
+  },
 };
 
 export default nextConfig;

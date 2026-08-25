@@ -1,12 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
 
-// Supabase 配置
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
-
-if (!supabaseUrl || !supabaseKey) {
-  console.warn('Supabase 环境变量未配置，部分功能可能不可用');
-}
+// Supabase 配置 - 使用占位符避免构建时崩溃
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co';
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-key';
 
 // 创建 Supabase 客户端
 export const supabase = createClient(supabaseUrl, supabaseKey, {

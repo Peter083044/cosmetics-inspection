@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/db';
+import { supabase } from '@/lib/db';
 import { getCurrentUser, isAdmin } from '@/lib/auth';
 
 // GET /api/storage - 获取存储信息
@@ -11,24 +11,30 @@ export async function GET(request: NextRequest) {
     }
 
     // 获取检验记录数量
-    const { count: inspectionCount, error: inspectionError } = await db.inspections.getAll().count();
+    const { count: inspectionCount, error: inspectionError } = await supabase
+      .from('inspections')
+      .select('id', { count: 'exact', head: true });
     
     if (inspectionError) throw inspectionError;
 
     // 获取用户数量
-    const { count: userCount, error: userError } = await db.users.getAll().count();
+    const { count: userCount, error: userError } = await supabase
+      .from('users')
+      .select('id', { count: 'exact', head: true });
     
     if (userError) throw userError;
 
     // 获取产品数量
-    const { count: productCount, error: productError } = await db.products.getAll().count();
+    const { count: productCount, error: productError } = await supabase
+      .from('products')
+      .select('id', { count: 'exact', head: true });
     
     if (productError) throw productError;
 
     return NextResponse.json({
-      inspectionCount,
-      userCount,
-      productCount,
+      inspectionCount: inspectionCount || 0,
+      userCount: userCount || 0,
+      productCount: productCount || 0,
       // 照片存储信息需要从腾讯云获取，这里暂时返回估算值
       photoStorage: {
         used: '0 MB',

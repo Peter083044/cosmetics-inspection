@@ -5,7 +5,7 @@ import { getCurrentUser, isAdmin } from '@/lib/auth';
 // GET /api/inspections/[id]/approve - 获取审核详情
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const user = await getCurrentUser(request);
@@ -13,13 +13,14 @@ export async function GET(
       return NextResponse.json({ error: '未登录' }, { status: 401 });
     }
 
-    const inspectionId = parseInt(params.id);
+    const { id } = await params;
+    const inspectionId = parseInt(id);
     if (isNaN(inspectionId)) {
       return NextResponse.json({ error: '无效的检验 ID' }, { status: 400 });
     }
 
-    const { data: inspection, error } = await db.inspections.findById(inspectionId);
-    if (error || !inspection) {
+    const inspection = await db.inspections.findById(inspectionId);
+    if (!inspection) {
       return NextResponse.json({ error: '检验记录不存在' }, { status: 404 });
     }
 
@@ -33,7 +34,7 @@ export async function GET(
 // POST /api/inspections/[id]/approve - 审核操作
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const user = await getCurrentUser(request);
@@ -41,7 +42,8 @@ export async function POST(
       return NextResponse.json({ error: '未登录' }, { status: 401 });
     }
 
-    const inspectionId = parseInt(params.id);
+    const { id } = await params;
+    const inspectionId = parseInt(id);
     if (isNaN(inspectionId)) {
       return NextResponse.json({ error: '无效的检验 ID' }, { status: 400 });
     }
@@ -53,8 +55,8 @@ export async function POST(
       return NextResponse.json({ error: '请指定审核操作' }, { status: 400 });
     }
 
-    const { data: inspection, error: fetchError } = await db.inspections.findById(inspectionId);
-    if (fetchError || !inspection) {
+    const inspection = await db.inspections.findById(inspectionId);
+    if (!inspection) {
       return NextResponse.json({ error: '检验记录不存在' }, { status: 404 });
     }
 

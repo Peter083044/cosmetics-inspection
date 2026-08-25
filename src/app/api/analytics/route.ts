@@ -15,15 +15,7 @@ export async function GET(request: NextRequest) {
     }
 
     // 获取所有检验记录
-    const { data: inspections, error } = await db
-      .from('inspections')
-      .select('*')
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      console.error('Get analytics error:', error);
-      return NextResponse.json({ error: '获取分析数据失败' }, { status: 500 });
-    }
+    const inspections = await db.inspections.getAll();
 
     // 按日期统计
     const dailyStats: Record<string, number> = {};
