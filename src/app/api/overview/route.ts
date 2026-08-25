@@ -1,0 +1,51 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { db } from '@/lib/db';
+import { getCurrentUser, isAdmin } from '@/lib/auth';
+
+// GET /api/overview - 获取概览数据
+export async function GET(request: NextRequest) {
+  try {
+    const user = await getCurrentUser(request);
+    if (!user) {
+      return NextResponse.json({ error: '未登录' }, { status: 401 });
+    }
+
+    if (!isAdmin(user)) {
+      return NextResponse.json({ error: '无管理员权限' }, { status: 403 });
+    }
+
+    // 获取所有检验记录
+    const { data: inspections, error } = await db
+      .from('inspections')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(100);
+
+    if (error) {
+      console.error('Get overview error:', error);
+      return NextResponse.json({ error: '获取概览数据失败' }, { status: 500 });
+    }
+
+    // 统计
+    const overview = {
+      total: inspections.length,
+      approved: inspections.filter((i) => i.status === 'approved').length,
+      rejected: inspections.filter((i) => i.status === 'rejected').length,
+      pending: inspections.filter(
+        (i) =>
+          i.status !== 'approved' &&
+          i.status !== 'rejected' &&
+          i.status !== 'draft'
+      ).length,
+      draft: inspections.filter((i) => i.status === 'draft').length,
+    };
+
+    // 最近 5 条记录
+    const recent = inspections.slice(0, 5);
+
+    return NextResponse.json({ overview, recent });
+  } catch (error) {
+    console.error('Get overview error:', error);
+    return NextResponse.json({ error: '获取概览数据失败' }, { status: 500 });
+  }
+}

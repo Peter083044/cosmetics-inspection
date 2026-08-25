@@ -1,13 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getCurrentUser } from '@/lib/auth';
-import db, { initDatabase } from '@/lib/db';
+import { db } from '@/lib/db';
+import { getCurrentUser, isAdmin } from '@/lib/auth';
 
-initDatabase();
-
-// GET /api/export - 导出检验记录
+// GET /api/export - 导出 CSV
 export async function GET(request: NextRequest) {
   try {
-    const user = await getCurrentUser();
+    const user = await getCurrentUser(request);
     if (!user) {
       return NextResponse.json({ error: '未登录' }, { status: 401 });
     }
@@ -15,172 +13,65 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const startDate = searchParams.get('startDate');
     const endDate = searchParams.get('endDate');
-    const status = searchParams.get('status');
 
-    let query = `
-      SELECT 
-        i.id,
-        i.status,
-        i.result,
-        i.result_summary,
-        i.submit_explanation,
-        i.rejected_to,
-        i.created_at,
-        i.updated_at,
-        i.inspection_date,
-        i.product_name,
-        i.product_code,
-        i.color_number,
-        i.batch_number,
-        i.work_order_image,
-        u.name as assistant_name
-      FROM inspections i
-      JOIN users u ON i.assistant_id = u.id
-      WHERE 1=1
-    `;
-    const params: any[] = [];
+    let query = db.inspections.getAll();
 
     if (startDate) {
-      query += ' AND i.created_at >= ?';
-      params.push(startDate);
+      query = query.gte('created_at', startDate);
     }
-
     if (endDate) {
-      query += ' AND i.created_at <= ?';
-      params.push(endDate + ' 23:59:59');
+      query = query.lte('created_at', endDate + 'T23:59:59');
     }
 
-    if (status) {
-      query += ' AND i.status = ?';
-      params.push(status);
-    }
+    const { data: inspections, error } = await query
+      .order('created_at', { ascending: false });
+    
+    if (error) throw error;
 
-    query += ' ORDER BY i.created_at DESC';
+    // 生成 CSV
+    const headers = [
+      '检验日期',
+      '产品名称',
+      '产品代码',
+      '色号',
+      '批号',
+      '辅助人员',
+      '状态',
+      '结果',
+      '提交说明',
+      '创建时间',
+    ];
 
-    const inspections = db.prepare(query).all(...params) as any[];
+    const rows = inspections.map((inspection) => [
+      inspection.inspection_date || '',
+      inspection.product_name || '',
+      inspection.product_code || '',
+      inspection.color_number || '',
+      inspection.batch_number || '',
+      inspection.assistant_name || '',
+      inspection.status || '',
+      inspection.result || '',
+      inspection.submit_explanation || '',
+      inspection.created_at || '',
+    ]);
 
-    // 组装导出数据
-    const exportData = inspections.map((inspection) => {
-      return {
-        ...inspection,
-        approvals: [],
-        exceptions: [],
-        photos: [],
-      };
-    });
+    const csvContent = [
+      headers.join(','),
+      ...rows.map((row) => row.map((cell) => `"${cell}"`).join(',')),
+    ].join('\n');
 
-    // 生成CSV格式，添加BOM以支持Excel正确显示中文
-    const csv = '\uFEFF' + generateCSV(exportData);
+    // 添加 UTF-8 BOM
+    const BOM = '\uFEFF';
+    const csvWithBOM = BOM + csvContent;
 
-    return new NextResponse(csv, {
+    return new NextResponse(csvWithBOM, {
       headers: {
         'Content-Type': 'text/csv; charset=utf-8',
-        'Content-Disposition': `attachment; filename=inspections-${Date.now()}.csv`,
+        'Content-Disposition': `attachment; filename=inspections_${Date.now()}.csv`,
       },
     });
   } catch (error) {
-    console.error('Export error:', error);
-    return NextResponse.json(
-      { error: '导出失败' },
-      { status: 500 }
-    );
+    console.error('Export CSV error:', error);
+    return NextResponse.json({ error: '导出失败' }, { status: 500 });
   }
-}
-
-function generateCSV(data: any[]): string {
-  const headers = [
-    '检验ID',
-    '检验日期',
-    '产品名称',
-    '产品代码',
-    '色号',
-    '批号',
-    '工单图片',
-    '辅助人员',
-    '检验结果',
-    '标签核对',
-    '状态',
-    '提交说明',
-    '退回至',
-    '创建时间',
-    '更新时间',
-    '审核历史',
-    '异常记录',
-  ];
-
-  const rows = data.map((item) => {
-    const statusMap: Record<string, string> = {
-      draft: '草稿',
-      pending: '待提交',
-      line_leader_review: '线长审核中',
-      supervisor_review: '主管审核中',
-      qc_review: 'QC审核中',
-      approved: '已通过',
-      rejected: '已驳回',
-    };
-
-    const resultMap: Record<string, string> = {
-      pass: '通过',
-      fail: '不通过',
-    };
-
-    const roleMap: Record<string, string> = {
-      assistant: '辅助',
-      line_leader: '线长',
-      supervisor: '主管',
-      qc: 'QC',
-    };
-
-    const approvals = item.approvals
-      .map((a: any) => `${a.reviewer_name}(${a.reviewer_role}): ${a.action} - ${a.comments || ''}`)
-      .join('; ');
-
-    const exceptions = item.exceptions
-      .map((e: any) => `[${e.severity}] ${e.description}${e.resolved ? '(已解决)' : '(未解决)'}`)
-      .join('; ');
-
-    // 解析标签核对
-    let labelSummary = '';
-    if (item.label_comparisons) {
-      let labels: any[] = [];
-      if (typeof item.label_comparisons === 'string') {
-        try { labels = JSON.parse(item.label_comparisons); } catch { labels = []; }
-      } else {
-        labels = item.label_comparisons;
-      }
-      labelSummary = labels
-        .filter((lc: any) => lc.standard || lc.actual)
-        .map((lc: any) => `${lc.name || '标签'}: ${resultMap[lc.result] || lc.result || '未判定'}${lc.difference ? '(' + lc.difference + ')' : ''}`)
-        .join('; ');
-    }
-
-    return [
-      item.id,
-      item.inspection_date || item.created_at.split(' ')[0],
-      item.product_name,
-      item.product_code,
-      item.color_number,
-      item.batch_number || '',
-      item.work_order_image || '',
-      item.assistant_name,
-      resultMap[item.result] || item.result || '',
-      labelSummary,
-      statusMap[item.status] || item.status,
-      item.submit_explanation || '',
-      item.rejected_to ? (roleMap[item.rejected_to] || item.rejected_to) : '',
-      item.created_at,
-      item.updated_at,
-      approvals,
-      exceptions,
-    ];
-  });
-
-  // 添加BOM以支持中文
-  const bom = '\uFEFF';
-  const csvContent = [
-    headers.join(','),
-    ...rows.map((row) => row.map((cell) => `"${cell}"`).join(',')),
-  ].join('\n');
-
-  return bom + csvContent;
 }

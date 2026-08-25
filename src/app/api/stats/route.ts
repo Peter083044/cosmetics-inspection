@@ -1,83 +1,74 @@
 import { NextRequest, NextResponse } from 'next/server';
-import db from '@/lib/db';
-import { getCurrentUser } from '@/lib/auth';
+import { db } from '@/lib/db';
+import { getCurrentUser, isAdmin } from '@/lib/auth';
 
+// GET /api/stats - 获取统计数据
 export async function GET(request: NextRequest) {
   try {
-    const user = await getCurrentUser();
+    const user = await getCurrentUser(request);
     if (!user) {
-      return NextResponse.json({ success: false, error: '未登录' }, { status: 401 });
+      return NextResponse.json({ error: '未登录' }, { status: 401 });
     }
 
-    // 总记录数
-    const totalRecords = db.prepare('SELECT COUNT(*) as count FROM inspections').get() as { count: number };
+    // 获取所有检验记录
+    const { data: inspections, error } = await db.inspections.getAll()
+      .order('created_at', { ascending: false });
+    
+    if (error) throw error;
 
-    // 各状态记录数
-    const statusStats = db.prepare(`
-      SELECT status, COUNT(*) as count 
-      FROM inspections 
-      GROUP BY status
-    `).all() as { status: string; count: number }[];
+    // 统计总数
+    const totalRecords = inspections.length;
 
-    // 通过率统计
-    const passStats = db.prepare(`
-      SELECT 
-        COUNT(*) as total,
-        SUM(CASE WHEN result = 'pass' THEN 1 ELSE 0 END) as passed
-      FROM inspections
-    `).get() as { total: number; passed: number };
+    // 统计各状态数量
+    const statusCounts: Record<string, number> = {};
+    for (const inspection of inspections) {
+      const status = inspection.status || 'draft';
+      statusCounts[status] = (statusCounts[status] || 0) + 1;
+    }
 
-    // 最近30天每日记录数
-    const dailyStats = db.prepare(`
-      SELECT 
-        DATE(created_at) as date,
-        COUNT(*) as count
-      FROM inspections
-      WHERE created_at >= datetime('now', '-30 days')
-      GROUP BY DATE(created_at)
-      ORDER BY date
-    `).all() as { date: string; count: number }[];
+    // 统计通过率
+    let passedCount = 0;
+    let totalCount = 0;
+    for (const inspection of inspections) {
+      if (inspection.comparisons) {
+        for (const key of Object.keys(inspection.comparisons)) {
+          const comp = inspection.comparisons[key];
+          if (comp && comp.status) {
+            totalCount++;
+            if (comp.status === 'passed') {
+              passedCount++;
+            }
+          }
+        }
+      }
+    }
+    const passRate = totalCount > 0 ? Math.round((passedCount / totalCount) * 100) : 0;
 
-    // 各审核人处理记录数
-    const reviewerStats = db.prepare(`
-      SELECT 
-        current_reviewer_name,
-        COUNT(*) as count
-      FROM inspections
-      WHERE current_reviewer_name IS NOT NULL AND current_reviewer_name != ''
-      GROUP BY current_reviewer_name
-      ORDER BY count DESC
-      LIMIT 10
-    `).all() as { current_reviewer_name: string; count: number }[];
+    // 统计最近 7 天的趋势
+    const last7Days: Record<string, number> = {};
+    const today = new Date();
+    for (let i = 6; i >= 0; i--) {
+      const date = new Date(today);
+      date.setDate(date.getDate() - i);
+      const dateStr = date.toISOString().split('T')[0];
+      last7Days[dateStr] = 0;
+    }
 
-    // 产品统计
-    const productStats = db.prepare(`
-      SELECT 
-        product_name,
-        COUNT(*) as count
-      FROM inspections
-      GROUP BY product_name
-      ORDER BY count DESC
-      LIMIT 10
-    `).all() as { product_name: string; count: number }[];
+    for (const inspection of inspections) {
+      const dateStr = inspection.created_at?.split('T')[0];
+      if (dateStr && last7Days.hasOwnProperty(dateStr)) {
+        last7Days[dateStr]++;
+      }
+    }
 
     return NextResponse.json({
-      success: true,
-      data: {
-        total: totalRecords.count,
-        status: statusStats,
-        passRate: {
-          total: passStats.total,
-          passed: passStats.passed,
-          rate: passStats.total > 0 ? Math.round((passStats.passed / passStats.total) * 100) : 0
-        },
-        daily: dailyStats,
-        reviewers: reviewerStats,
-        products: productStats
-      }
+      totalRecords,
+      statusCounts,
+      passRate,
+      last7Days,
     });
   } catch (error) {
-    console.error('Stats API error:', error);
-    return NextResponse.json({ success: false, error: '获取统计数据失败' }, { status: 500 });
+    console.error('Get stats error:', error);
+    return NextResponse.json({ error: '获取统计数据失败' }, { status: 500 });
   }
 }

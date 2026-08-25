@@ -1,0 +1,28 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { db } from '@/lib/db';
+import { getCurrentUser, isAdmin } from '@/lib/auth';
+
+// GET /api/license - 获取许可证信息
+export async function GET(request: NextRequest) {
+  try {
+    const user = await getCurrentUser(request);
+    if (!user) {
+      return NextResponse.json({ error: '未登录' }, { status: 401 });
+    }
+
+    if (!isAdmin(user)) {
+      return NextResponse.json({ error: '无管理员权限' }, { status: 403 });
+    }
+
+    return NextResponse.json({
+      license: {
+        name: 'MIT License',
+        version: '1.0.0',
+        url: 'https://opensource.org/licenses/MIT',
+      },
+    });
+  } catch (error) {
+    console.error('Get license error:', error);
+    return NextResponse.json({ error: '获取许可证信息失败' }, { status: 500 });
+  }
+}

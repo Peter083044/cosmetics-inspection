@@ -1,110 +1,128 @@
-import { NextResponse } from "next/server";
-import db, { initDatabase } from "@/lib/db";
-import { hashPassword } from "@/lib/auth";
-import { getCurrentUser } from "@/lib/auth";
+import { NextRequest, NextResponse } from 'next/server';
+import { db } from '@/lib/db';
+import { getCurrentUser, isAdmin } from '@/lib/auth';
 
-initDatabase();
-
-// POST /api/users/batch - 批量创建用户（仅管理员）
-export async function POST(request: Request) {
+// GET /api/users/batch - 批量创建用户
+export async function GET(request: NextRequest) {
   try {
-    const user = await getCurrentUser();
-    if (!user) {
-      return NextResponse.json({ error: "未登录" }, { status: 401 });
-    }
-    if (user.role !== "admin") {
-      return NextResponse.json({ error: "无权限" }, { status: 403 });
+    const user = await getCurrentUser(request);
+    if (!user || !isAdmin(user)) {
+      return NextResponse.json({ error: '无权限' }, { status: 403 });
     }
 
-    const body = await request.json();
-    const {
-      assistant_count = 0,
-      line_leader_count = 0,
-      supervisor_count = 0,
-      qc_count = 0,
-      password = "pass123",
-    } = body;
+    const { searchParams } = new URL(request.url);
+    const role = searchParams.get('role');
+    const count = parseInt(searchParams.get('count') || '1');
+    const password = searchParams.get('password') || 'pass123';
 
-    const hashedPassword = await hashPassword(password);
-    const createdUsers: { username: string; role: string; name: string }[] = [];
+    if (!role) {
+      return NextResponse.json({ error: '请指定角色' }, { status: 400 });
+    }
 
-    // 获取当前各角色的最大序号
-    const getMaxId = (prefix: string): number => {
-      const result = db
-        .prepare(`SELECT username FROM users WHERE username LIKE ? ORDER BY id DESC LIMIT 1`)
-        .get(`${prefix}%`) as { username: string } | undefined;
-      if (!result) return 0;
-      const match = result.username.match(new RegExp(`${prefix}(\\d+)`));
-      return match ? parseInt(match[1]) : 0;
+    // 批量创建用户
+    const rolePrefix: Record<string, string> = {
+      assistant: 'assistant',
+      line_leader: 'leader',
+      supervisor: 'supervisor',
+      qc: 'qc',
     };
 
-    // 创建辅助人员
-    let assistantStart = getMaxId("assistant") + 1;
-    for (let i = 0; i < assistant_count; i++) {
-      const username = `assistant${assistantStart + i}`;
-      const name = `辅助${assistantStart + i}`;
-      try {
-        db.prepare(
-          "INSERT INTO users (username, password, name, role) VALUES (?, ?, ?, ?)"
-        ).run(username, hashedPassword, name, "assistant");
-        createdUsers.push({ username, role: "assistant", name });
-      } catch {
-        // 用户名已存在，跳过
-      }
-    }
+    const prefix = rolePrefix[role] || 'user';
+    const createdUsers = [];
 
-    // 创建线长
-    let leaderStart = getMaxId("leader") + 1;
-    for (let i = 0; i < line_leader_count; i++) {
-      const username = `leader${leaderStart + i}`;
-      const name = `线长${leaderStart + i}`;
-      try {
-        db.prepare(
-          "INSERT INTO users (username, password, name, role) VALUES (?, ?, ?, ?)"
-        ).run(username, hashedPassword, name, "line_leader");
-        createdUsers.push({ username, role: "line_leader", name });
-      } catch {
-        // 用户名已存在，跳过
-      }
-    }
+    for (let i = 1; i <= count; i++) {
+      const username = `${prefix}${i}`;
+      const name = `${prefix}${i}`;
+      const hashedPassword = await hashPassword(password);
 
-    // 创建主管
-    let supervisorStart = getMaxId("supervisor") + 1;
-    for (let i = 0; i < supervisor_count; i++) {
-      const username = `supervisor${supervisorStart + i}`;
-      const name = `主管${supervisorStart + i}`;
-      try {
-        db.prepare(
-          "INSERT INTO users (username, password, name, role) VALUES (?, ?, ?, ?)"
-        ).run(username, hashedPassword, name, "supervisor");
-        createdUsers.push({ username, role: "supervisor", name });
-      } catch {
-        // 用户名已存在，跳过
-      }
-    }
+      const { data, error } = await db.users.create({
+        username,
+        password: hashedPassword,
+        name,
+        role,
+      });
 
-    // 创建QC
-    let qcStart = getMaxId("qc") + 1;
-    for (let i = 0; i < qc_count; i++) {
-      const username = `qc${qcStart + i}`;
-      const name = `QC${qcStart + i}`;
-      try {
-        db.prepare(
-          "INSERT INTO users (username, password, name, role) VALUES (?, ?, ?, ?)"
-        ).run(username, hashedPassword, name, "qc");
-        createdUsers.push({ username, role: "qc", name });
-      } catch {
-        // 用户名已存在，跳过
+      if (error) {
+        console.error(`Failed to create user ${username}:`, error);
+        continue;
       }
+
+      createdUsers.push(data);
     }
 
     return NextResponse.json({
       success: true,
-      message: `成功创建 ${createdUsers.length} 个账号\n辅助: ${assistant_count} 人\n线长: ${line_leader_count} 人\n主管: ${supervisor_count} 人\nQC: ${qc_count} 人\n\n所有账号密码: ${password}`,
-      created_count: createdUsers.length,
+      created: createdUsers.length,
+      users: createdUsers,
     });
   } catch (error) {
-    console.error("Batch create users error:", error);
-    return NextResponse.json({ error: "批量创建失败" }, { status: 500 });
+    console.error('Batch create users error:', error);
+    return NextResponse.json({ error: '批量创建用户失败' }, { status: 500 });
   }
+}
+
+// POST /api/users/batch - 批量创建用户
+export async function POST(request: NextRequest) {
+  try {
+    const user = await getCurrentUser(request);
+    if (!user || !isAdmin(user)) {
+      return NextResponse.json({ error: '无权限' }, { status: 403 });
+    }
+
+    const body = await request.json();
+    const { role, count = 1, password = 'pass123' } = body;
+
+    if (!role) {
+      return NextResponse.json({ error: '请指定角色' }, { status: 400 });
+    }
+
+    // 批量创建用户
+    const rolePrefix: Record<string, string> = {
+      assistant: 'assistant',
+      line_leader: 'leader',
+      supervisor: 'supervisor',
+      qc: 'qc',
+    };
+
+    const prefix = rolePrefix[role] || 'user';
+    const createdUsers = [];
+
+    for (let i = 1; i <= count; i++) {
+      const username = `${prefix}${i}`;
+      const name = `${prefix}${i}`;
+      const hashedPassword = await hashPassword(password);
+
+      const { data, error } = await db.users.create({
+        username,
+        password: hashedPassword,
+        name,
+        role,
+      });
+
+      if (error) {
+        console.error(`Failed to create user ${username}:`, error);
+        continue;
+      }
+
+      createdUsers.push(data);
+    }
+
+    return NextResponse.json({
+      success: true,
+      created: createdUsers.length,
+      users: createdUsers,
+    });
+  } catch (error) {
+    console.error('Batch create users error:', error);
+    return NextResponse.json({ error: '批量创建用户失败' }, { status: 500 });
+  }
+}
+
+async function hashPassword(password: string): Promise<string> {
+  // 使用简单的哈希（生产环境应使用 bcrypt）
+  const encoder = new TextEncoder();
+  const data = encoder.encode(password);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 }
