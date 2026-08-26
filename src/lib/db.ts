@@ -1,13 +1,21 @@
 import { createClient } from '@supabase/supabase-js';
 
-// Supabase 配置 - 使用占位符避免构建时崩溃
+// Supabase 配置
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co';
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-key';
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-key';
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || supabaseAnonKey;
 
-// 创建 Supabase 客户端
-export const supabase = createClient(supabaseUrl, supabaseKey, {
+// 服务端客户端（使用 service role key，绕过 RLS）
+export const supabase = createClient(supabaseUrl, supabaseServiceKey, {
   auth: {
     persistSession: false,
+  },
+});
+
+// 客户端客户端（使用 anon key，受 RLS 限制）
+export const supabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    persistSession: true,
   },
 });
 
@@ -70,14 +78,12 @@ export interface Approval {
 export const db = {
   users: {
     async findByUsername(username: string): Promise<User | null> {
-      console.log('Supabase findByUsername:', { username, supabaseUrl, hasKey: !!supabaseKey });
       const { data, error } = await supabase
         .from('users')
         .select('*')
         .eq('username', username)
         .single();
       
-      console.log('Supabase result:', { data, error });
       if (error) return null;
       return data as User;
     },
