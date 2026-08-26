@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { hashPassword, verifyPassword, generateToken, setTokenCookie, clearTokenCookie } from '@/lib/auth';
+import { hashPassword, verifyPassword, generateToken, setTokenCookie, clearTokenCookie, getCurrentUser } from '@/lib/auth';
 
 // POST /api/auth - 登录
 export async function POST(request: NextRequest) {
@@ -13,15 +13,13 @@ export async function POST(request: NextRequest) {
     }
 
     const user = await db.users.findByUsername(username);
-    console.log('Login attempt:', username, 'User found:', !!user, user ? { id: user.id, username: user.username, hasPassword: !!user.password } : null);
     if (!user) {
-      return NextResponse.json({ error: '用户名或密码错误 (用户不存在)' }, { status: 401 });
+      return NextResponse.json({ error: '用户名或密码错误' }, { status: 401 });
     }
 
     const isValid = await verifyPassword(password, user.password);
-    console.log('Password verify:', { isValid, storedHash: user.password?.substring(0, 20) });
     if (!isValid) {
-      return NextResponse.json({ error: '用户名或密码错误 (密码不匹配)' }, { status: 401 });
+      return NextResponse.json({ error: '用户名或密码错误' }, { status: 401 });
     }
 
     const token = await generateToken(user);
@@ -42,6 +40,39 @@ export async function POST(request: NextRequest) {
   }
 }
 
+// PUT /api/auth - 修改密码
+export async function PUT(request: NextRequest) {
+  try {
+    const user = await getCurrentUser(request);
+    if (!user) {
+      return NextResponse.json({ error: '未登录' }, { status: 401 });
+    }
+
+    const body = await request.json();
+    const { oldPassword, newPassword } = body;
+
+    if (!oldPassword || !newPassword) {
+      return NextResponse.json({ error: '请填写完整' }, { status: 400 });
+    }
+
+    const isValid = await verifyPassword(oldPassword, user.password);
+    if (!isValid) {
+      return NextResponse.json({ error: '当前密码错误' }, { status: 400 });
+    }
+
+    const hashedNewPassword = await hashPassword(newPassword);
+    const updated = await db.users.update(user.id, { password: hashedNewPassword });
+    if (!updated) {
+      return NextResponse.json({ error: '修改失败' }, { status: 500 });
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('Change password error:', error);
+    return NextResponse.json({ error: '修改密码失败' }, { status: 500 });
+  }
+}
+
 // DELETE /api/auth - 登出
 export async function DELETE() {
   await clearTokenCookie();
@@ -51,7 +82,6 @@ export async function DELETE() {
 // GET /api/auth - 获取当前用户
 export async function GET(request: NextRequest) {
   try {
-    const { getCurrentUser } = await import('@/lib/auth');
     const user = await getCurrentUser(request);
     
     if (!user) {
@@ -59,6 +89,7 @@ export async function GET(request: NextRequest) {
     }
 
     return NextResponse.json({
+      success: true,
       user: {
         id: user.id,
         username: user.username,

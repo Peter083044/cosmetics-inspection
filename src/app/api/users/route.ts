@@ -25,7 +25,9 @@ export async function GET(request: NextRequest) {
     const { data, error } = await query;
     if (error) throw error;
 
-    return NextResponse.json({ users: data });
+    // 移除密码字段
+    const safeData = (data || []).map(({ password, ...rest }) => rest);
+    return NextResponse.json({ success: true, data: safeData });
   } catch (error) {
     console.error('Get users error:', error);
     return NextResponse.json({ error: '获取用户列表失败' }, { status: 500 });

@@ -32,13 +32,15 @@ export async function GET(request: NextRequest) {
     if (productError) throw productError;
 
     return NextResponse.json({
-      inspectionCount: inspectionCount || 0,
-      userCount: userCount || 0,
-      productCount: productCount || 0,
-      // 照片存储信息需要从腾讯云获取，这里暂时返回估算值
-      photoStorage: {
-        used: '0 MB',
-        total: '10 GB',
+      success: true,
+      data: {
+        inspectionCount: inspectionCount || 0,
+        userCount: userCount || 0,
+        productCount: productCount || 0,
+        photoStorage: {
+          used: '0 MB',
+          total: '10 GB',
+        },
       },
     });
   } catch (error) {

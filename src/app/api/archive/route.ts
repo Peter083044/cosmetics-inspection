@@ -31,8 +31,11 @@ export async function GET(request: NextRequest) {
     if (error) throw error;
 
     return NextResponse.json({
-      records: inspections || [],
-      count: inspections?.length || 0,
+      success: true,
+      data: {
+        records: inspections || [],
+        count: inspections?.length || 0,
+      },
     });
   } catch (error) {
     console.error('Get archive error:', error);

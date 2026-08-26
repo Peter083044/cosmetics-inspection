@@ -12,12 +12,27 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url);
     const status = searchParams.get('status');
+    const id = searchParams.get('id');
     const page = parseInt(searchParams.get('page') || '1');
     const limit = parseInt(searchParams.get('limit') || '20');
 
+    // 单条记录查询
+    if (id) {
+      const { data, error } = await supabase
+        .from('inspections')
+        .select('*')
+        .eq('id', parseInt(id))
+        .single();
+      
+      if (error) {
+        return NextResponse.json({ success: false, error: '记录不存在' }, { status: 404 });
+      }
+      return NextResponse.json({ success: true, data });
+    }
+
     let query = supabase
       .from('inspections')
-      .select('*, users!inspections_assistant_id_fkey(name)', { count: 'exact' })
+      .select('*', { count: 'exact' })
       .order('created_at', { ascending: false })
       .range((page - 1) * limit, page * limit - 1);
     
@@ -39,7 +54,8 @@ export async function GET(request: NextRequest) {
     if (error) throw error;
 
     return NextResponse.json({
-      inspections: data || [],
+      success: true,
+      data: data || [],
       total: count || 0,
       page,
       limit,
@@ -50,7 +66,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST /api/inspections - 创建检验记录
+// POST /api/inspections - 创建检验记录 或 删除（管理员）
 export async function POST(request: NextRequest) {
   try {
     const user = await getCurrentUser(request);
@@ -59,6 +75,20 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
+
+    // 删除操作
+    if (body._action === 'delete' && body.ids) {
+      if (!isAdmin(user)) {
+        return NextResponse.json({ error: '无权限' }, { status: 403 });
+      }
+      const success = await db.inspections.deleteByIds(body.ids);
+      if (!success) {
+        return NextResponse.json({ error: '删除检验记录失败' }, { status: 500 });
+      }
+      return NextResponse.json({ success: true, message: `已删除 ${body.ids.length} 条记录` });
+    }
+
+    // 创建操作
     const {
       inspection_date,
       product_name,
