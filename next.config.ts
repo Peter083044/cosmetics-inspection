@@ -1,5 +1,4 @@
 import type { NextConfig } from 'next';
-import path from 'path';
 
 const nextConfig: NextConfig = {
   allowedDevOrigins: ['*.dev.coze.site'],
@@ -11,9 +10,6 @@ const nextConfig: NextConfig = {
         pathname: '/**',
       },
     ],
-  },
-  turbopack: {
-    root: path.resolve(__dirname),
   },
 };
 
